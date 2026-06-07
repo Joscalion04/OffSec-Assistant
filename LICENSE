@@ -1,21 +1,92 @@
-MIT License
+OffSec Assistant Ethical Use License 1.0
+=========================================
 
-Copyright (c) 2026 Joseph Leon
+Copyright (c) 2026 Joseph Leon (github.com/Joscalion04)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+DEFINITIONS
+-----------
+"Software" refers to OffSec Assistant and all associated files, documentation,
+configuration, commands, agents, templates, and tools contained in this repository.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+"Commercial Use" means any use intended for commercial advantage or monetary
+compensation, including but not limited to: incorporating the Software into a
+commercial product or service, offering the Software as part of a paid security
+consultancy or managed service, reselling or sublicensing the Software, or using
+the Software to generate revenue directly or indirectly without prior written
+authorization from the copyright holder.
 
+"Authorized Security Testing" means security assessments, penetration tests,
+vulnerability research, or similar activities conducted with explicit, documented,
+written authorization from the system owner and within the scope defined in that
+authorization.
+
+GRANT OF RIGHTS
+---------------
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this Software, to use, copy, study, modify, merge, and redistribute the Software,
+subject to ALL of the following conditions:
+
+1. ATTRIBUTION
+   All copies or substantial portions of the Software must retain this copyright
+   notice, the list of conditions, and the disclaimer below.
+
+2. NON-COMMERCIAL USE
+   Commercial Use of this Software is PROHIBITED without prior written
+   authorization from the copyright holder. To request commercial authorization,
+   contact: joscalion04@gmail.com
+
+   Non-profit organizations, academic institutions, independent security researchers,
+   and CTF participants are explicitly permitted to use this Software free of charge,
+   provided they comply with all other conditions herein.
+
+3. ETHICAL USE — MANDATORY CONDITION
+   You MAY NOT use this Software, in whole or in part, to:
+
+   (a) Conduct any security assessment, penetration test, vulnerability scan,
+       exploitation, or security research on systems, networks, devices, or
+       applications without explicit, documented, prior written authorization
+       from the owner of the target systems.
+
+   (b) Engage in any activity that violates applicable local, national, or
+       international laws or regulations, including but not limited to the
+       Computer Fraud and Abuse Act (CFAA), the Budapest Convention on
+       Cybercrime, and equivalent laws in other jurisdictions.
+
+   (c) Harm, stalk, harass, surveil, dox, or violate the privacy of any
+       individual or group.
+
+   (d) Develop or deploy offensive capabilities against critical infrastructure,
+       healthcare systems, election systems, or emergency services.
+
+   (e) Enable, support, or facilitate any criminal, terrorist, or state-sponsored
+       malicious activity.
+
+   (f) Circumvent, disable, or undermine security controls without explicit
+       authorization from the affected system owner.
+
+   Violation of this clause immediately and automatically terminates all rights
+   granted under this License.
+
+4. REDISTRIBUTION
+   Redistributions of the Software, modified or unmodified, must:
+   (a) Retain this License in full.
+   (b) Clearly document any modifications made.
+   (c) Not misrepresent the original authorship or purpose of the Software.
+   (d) Not remove or alter the ethical use restrictions in this License.
+
+DISCLAIMER
+----------
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY — WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE — ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The authors bear no responsibility for any misuse of this Software. The user
+assumes full legal and ethical responsibility for how this tool is used.
+
+ENFORCEMENT
+-----------
+The copyright holder reserves the right to revoke this License for any individual
+or organization found to be in violation of the Ethical Use conditions above.
