@@ -1,0 +1,62 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nmap:*)",
+      "Bash(masscan:*)",
+      "Bash(ffuf:*)",
+      "Bash(nikto:*)",
+      "Bash(nuclei:*)",
+      "Bash(amass:*)",
+      "Bash(subfinder:*)",
+      "Bash(theHarvester:*)",
+      "Bash(searchsploit:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(whois:*)",
+      "Bash(dig:*)",
+      "Bash(host:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(find:*)",
+      "Bash(python3:*)",
+      "Bash(pip:*)",
+      "Bash(git:*)",
+      "Bash(tee:*)",
+      "Bash(date:*)",
+      "Bash(which:*)",
+      "Bash(pacman:*)",
+      "Bash(yay:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*:*)",
+      "Bash(dd:*)"
+    ]
+  },
+  "env": {
+    "OFFSEC_HOME": "/home/joseph/Documents/OffSec/OffSec-Assistant",
+    "FINDINGS_DIR": "/home/joseph/Documents/OffSec/OffSec-Assistant/findings",
+    "REPORTS_DIR": "/home/joseph/Documents/OffSec/OffSec-Assistant/reports",
+    "LOGS_DIR": "/home/joseph/Documents/OffSec/OffSec-Assistant/logs",
+    "TEMPLATES_DIR": "/home/joseph/Documents/OffSec/OffSec-Assistant/templates",
+    "WORDLISTS_DIR": "/usr/share/wordlists",
+    "REPORT_LANG": "es",
+    "CVSS_DEFAULT": "3.1"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/joseph/Documents/OffSec/OffSec-Assistant/tools/logger.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

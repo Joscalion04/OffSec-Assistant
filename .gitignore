@@ -1,0 +1,13 @@
+.env
+.env.local
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+.vscode/
+.idea/
+logs/
+reports/
+findings/
+
