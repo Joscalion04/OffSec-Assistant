@@ -17,8 +17,17 @@ Si no existe scope.md en el engagement, detente y avisá antes de continuar.
 3. `/new-engagement <nombre>` — inicializar estructura del engagement
 4. Editar `scope.md` — confirmar targets autorizados antes de cualquier acción activa
 5. `/recon <target>` → `/vuln-scan <target>` → explotación manual o guiada
-6. `/session-close <engagement>` — cerrar sesión al terminar el día
-7. `/report <engagement>` — generar reporte final
+6. Para entornos Windows/AD: `/ad-enum <dc> <engagement>` (enumeracion, Kerberoasting, BloodHound)
+7. Post-explotacion Linux/Windows: `/parse-privesc <engagement> <output_file>`
+8. Web testing con Burp: `/burp-scan scan <url>` → `/burp-scan findings <id> <engagement>`
+9. `/session-close <engagement>` — cerrar sesión al terminar el día
+10. `/report <engagement>` — generar reporte final (incluye MITRE ATT&CK y CVSS 3.1)
+
+## Stack de herramientas adicionales
+- AD/Windows: enum4linux-ng, ldapdomaindump, bloodhound-python, impacket (GetUserSPNs, GetNPUsers), netexec
+- Post-explotacion: linpeas, winpeas + parser automatico (parse-privesc.py)
+- Web: Burp Suite Professional REST API (burp-api.py)
+- MITRE ATT&CK: mapeador automatico (map-mitre.py) — 60+ tecnicas cubiertas
 
 ## Comportamiento como asistente
 

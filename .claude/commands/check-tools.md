@@ -9,13 +9,22 @@ Herramientas a verificar por categoria:
 
 - Reconocimiento: nmap, masscan, amass, subfinder, theHarvester
 - Web: ffuf, nikto, sqlmap, nuclei, whatweb, gobuster
+- Active Directory: enum4linux-ng, enum4linux, ldapdomaindump, bloodhound-python, crackmapexec, netexec
+- Impacket (AD): GetUserSPNs.py, GetNPUsers.py, secretsdump.py
 - Explotacion: metasploit, searchsploit
-- Post-explotacion: netcat, socat
+- Post-explotacion: netcat, socat, linpeas, winpeas
 - Utilidades: git, curl, wget, jq, whois, dig
 
 Para las que falten, indica el comando exacto de instalacion en Arch/Manjaro:
 - Primero intenta: `pacman -S <tool>`
 - Si no esta en repos oficiales: `yay -S <tool>` o `pip install <tool>`
+- Herramientas AD via pip: pip install impacket ldapdomaindump bloodhound netexec enum4linux-ng
+
+Tambien verificar herramientas del proyecto:
+- test -f "$OFFSEC_HOME/tools/map-mitre.py" && echo "MITRE mapper: OK" || echo "MITRE mapper: FALTA"
+- test -f "$OFFSEC_HOME/tools/parse-privesc.py" && echo "Privesc parser: OK" || echo "Privesc parser: FALTA"
+- test -f "$OFFSEC_HOME/tools/burp-api.py" && echo "Burp API client: OK" || echo "Burp API client: FALTA"
+- test -f "$OFFSEC_HOME/tools/run-ad-enum.sh" && echo "AD enum script: OK" || echo "AD enum script: FALTA"
 
 Ademas, verifica el sistema DLP del proyecto ejecutando estos checks:
 

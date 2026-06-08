@@ -12,14 +12,15 @@
 - **CVSS Vector:** CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
 - **CVE:** CVE-XXXX-XXXXX (si aplica)
 - **CWE:** CWE-XXX (si aplica)
+- **MITRE ATT&CK:** TXXXX — [Nombre de la técnica] ([Táctica])
 
 ## Descripción
 [Descripción clara y concisa de la vulnerabilidad. Qué es, por qué existe.]
 
 ## Host / URL afectado
-- **Target:** 192.168.1.X / https://example.com/path
+- **Target:** TGT-001 / HST-001 (usar tokens DLP — nunca IPs reales)
 - **Puerto / Servicio:** 443 / HTTPS
-- **Tecnología:** Apache 2.4.49
+- **Tecnología:** [Tecnología y versión detectada]
 
 ## Pasos para reproducir
 1. [Paso 1]
@@ -27,6 +28,8 @@
 3. [Paso 3]
 
 ## Evidencia
+[Descripción de evidencia capturada. Archivos en evidence/screenshots/]
+
 ## Impacto
 [Qué puede lograr un atacante si explota esta vulnerabilidad. Impacto en confidencialidad, integridad, disponibilidad.]
 
@@ -37,3 +40,4 @@
 - [CVE link]
 - [Documentación oficial]
 - [Artículo técnico]
+- MITRE ATT&CK: https://attack.mitre.org/techniques/TXXXX/

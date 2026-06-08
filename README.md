@@ -51,6 +51,9 @@ razonamiento ofensivo, la parte que realmente importa.
 |------|---------|-------------|
 | Reconocimiento | `/recon <target>` | nmap, WHOIS, dig, subfinder, theHarvester, WhatWeb |
 | Analisis de vulnerabilidades | `/vuln-scan <target>` | nmap NSE, Nikto, Nuclei, searchsploit |
+| Active Directory | `/ad-enum <dc> <eng>` | enum4linux-ng, ldapdomaindump, BloodHound, impacket |
+| Post-explotacion | `/parse-privesc <eng> <file>` | linPEAS/winPEAS parser automatico |
+| Web (Burp) | `/burp-scan <subcomando>` | Burp Suite Professional REST API |
 | Explotacion | `/exploit <target>` | Metasploit, sqlmap — siempre con confirmacion |
 
 ### Modo autonomo (-auto)
@@ -64,9 +67,33 @@ El agente toma decisiones basadas en resultados intermedios y actualiza `context
 | `doc-writer` | Pre-llena findings con CVSS 3.1 al detectar output relevante |
 | `penetration-tester` | Agente principal de ejecucion de fases |
 
+### Modulo Active Directory
+Enumeracion completa de entornos Windows/AD desde una sola sesion:
+- Null session SMB + NetBIOS via enum4linux-ng
+- LDAP dump completo del dominio (ldapdomaindump)
+- BloodHound Python collector — genera ZIP para importar en GUI
+- Kerberoasting y AS-REP Roasting via impacket
+- Fingerprint con CrackMapExec / NetExec
+
+### Post-explotacion: linPEAS / winPEAS parser
+Parsea automaticamente el output de linPEAS o winPEAS y genera un `finding_privesc.md`
+estructurado con vectores categorizados (SUID, sudo, cron, credenciales, kernel version),
+severidad estimada y mapping MITRE ATT&CK por categoria.
+
+### Integracion con Burp Suite Professional
+Cliente CLI para la REST API de Burp Suite Professional.
+Inicia scans, monitorea progreso y exporta hallazgos como `finding_burp_*.md` directamente
+al engagement, con mapeo MITRE y CVSS estimado.
+
+### MITRE ATT&CK auto-mapping
+Cada finding generado incluye la tecnica ATT&CK correspondiente.
+El mapeador (`tools/map-mitre.py`) cubre 60+ tecnicas en 10 tacticas.
+Uso: por keyword, por archivo finding existente, o integrado en todos los modulos.
+
 ### Documentacion y reportes
-- Findings estructurados con CVSS 3.1, CVE, CWE, reproduccion y remediacion
+- Findings estructurados con CVSS 3.1, CVE, CWE, MITRE ATT&CK, reproduccion y remediacion
 - Reporte final: Executive Summary + seccion tecnica completa en espanol
+- Recordatorio DLP pre-entrega: restaurar tokens antes de compartir con el cliente
 
 ### Contenedor Docker
 Imagen autocontenida basada en Kali Linux con todo el stack de pentesting incluido.
@@ -269,10 +296,6 @@ OffSec-Assistant/
 
 ### Seguridad ofensiva
 
-- Modulo Active Directory: BloodHound/SharpHound, attack paths automaticos
-- Parsing automatico de linpeas/winpeas con findings preformateados
-- Integracion con Burp Suite API para web testing desde el agente
-- Mapeo automatico de tecnicas a MITRE ATT&CK en cada hallazgo documentado
 - Integracion con plataformas CTF: HackTheBox API, TryHackMe
 - Modulo de threat intelligence con MISP u OpenCTI
 - Soporte multi-engagement simultaneo con dashboard unificado

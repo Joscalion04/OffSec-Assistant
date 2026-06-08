@@ -93,6 +93,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Capa 4b: Active Directory / Windows ─────────────────────────────────
+# enum4linux-ng, impacket suite, crackmapexec/netexec, bloodhound-python
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        enum4linux \
+        smbclient \
+        ldap-utils \
+        krb5-user \
+        libkrb5-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir \
+        impacket \
+        ldapdomaindump \
+        bloodhound \
+        netexec \
+        enum4linux-ng \
+    && pip3 install --no-cache-dir \
+        requests \
+        dnspython
+
 # ── Capa 5: VPN — OpenVPN + WireGuard ────────────────────────────────────
 # NET_ADMIN capability requerida en runtime (ver docker-compose.yml)
 RUN apt-get update && apt-get install -y --no-install-recommends \
