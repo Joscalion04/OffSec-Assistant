@@ -1,0 +1,62 @@
+# OffSec Assistant — .dockerignore
+#
+# PRINCIPIO: el build context debe ser mínimo y nunca contener credenciales.
+# Solo llegan al contexto los archivos que el Dockerfile copia explícitamente.
+
+# ── Credenciales y secretos — NUNCA en la imagen ─────────────────────────────
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# ── Configuraciones VPN — NUNCA en la imagen (se montan como volumen) ─────────
+*.ovpn
+*.conf
+docker/vpn/
+
+# ── Datos del engagement — van como volúmenes, no en la imagen ───────────────
+findings/
+reports/
+logs/
+wordlists/
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ── Archivos de configuración local de Claude Code ────────────────────────────
+# settings.local.json puede tener tokens/paths del host — no va en la imagen
+.claude/settings.local.json
+
+# ── Documentación — no necesaria en runtime ──────────────────────────────────
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE
+.github/
+
+# ── Artefactos de desarrollo ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+node_modules/
+*.log
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ── Docker files mismos (no necesarios dentro del contenedor) ─────────────────
+Dockerfile*
+docker-compose*.yml
+.dockerignore

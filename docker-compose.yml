@@ -1,0 +1,138 @@
+name: offsec-assistant
+
+# ── Uso ──────────────────────────────────────────────────────────────────────
+#
+#   Sin VPN (modo estándar):
+#     docker compose run --rm assistant
+#
+#   Con OpenVPN:
+#     Copiar config a docker/vpn/config.ovpn
+#     USE_VPN=true docker compose run --rm assistant
+#
+#   Con WireGuard:
+#     Copiar config a docker/vpn/wg0.conf
+#     USE_VPN=true docker compose run --rm assistant
+#
+#   Build target full (con Metasploit):
+#     docker compose -f docker-compose.yml -f docker-compose.full.yml run --rm assistant
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Cambiar a "full" para incluir Metasploit Framework
+      target: lite
+    image: offsec-assistant:lite
+    container_name: offsec-assistant
+
+    # TTY interactivo — requerido por Claude Code CLI
+    stdin_open: true
+    tty: true
+
+    # ── Variables de entorno ────────────────────────────────────────────────
+    environment:
+      # REQUERIDA: pasar desde el host o desde .env
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      # Opcional: true/false — activa OpenVPN o WireGuard al iniciar
+      USE_VPN: "${USE_VPN:-false}"
+      REPORT_LANG: "es"
+      TZ: "${TZ:-UTC}"
+      # Ruta base del proyecto — los scripts usan "${OFFSEC_HOME:-...}" como fallback
+      OFFSEC_HOME: "${OFFSEC_HOME:-/workspace}"
+
+    # ── Volúmenes ──────────────────────────────────────────────────────────
+    volumes:
+      # Datos persistentes del engagement (bind mounts → directorio del proyecto)
+      - type: bind
+        source: ./findings
+        target: /workspace/findings
+      - type: bind
+        source: ./reports
+        target: /workspace/reports
+      - type: bind
+        source: ./logs
+        target: /workspace/logs
+      - type: bind
+        source: ./templates
+        target: /workspace/templates
+        read_only: true
+      - type: bind
+        source: ./tools
+        target: /workspace/tools
+        read_only: true
+      # Configuración de Claude Code (persistente entre sesiones)
+      - offsec-claude-config:/root/.claude
+      # Configs VPN — solo lectura dentro del contenedor
+      # El directorio debe existir aunque esté vacío (ver docker/vpn/)
+      - type: bind
+        source: "${VPN_CONFIG_DIR:-./docker/vpn}"
+        target: /vpn
+        read_only: true
+
+    # ── Seguridad de capabilities ──────────────────────────────────────────
+    # Principio de menor privilegio: drop ALL, luego solo lo necesario
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN   # VPN (tun/tap), routing, iptables
+      - NET_RAW     # nmap raw sockets, masscan, ping
+      - NET_BIND_SERVICE  # bind a puertos < 1024 si necesario
+
+    # ── Opciones de seguridad del proceso ──────────────────────────────────
+    security_opt:
+      # Impide que procesos internos adquieran privilegios vía setuid/setgid
+      - no-new-privileges:true
+
+    # ── Red ────────────────────────────────────────────────────────────────
+    networks:
+      - offsec-net
+
+    # DNS explícito (evita depender del resolver del host)
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    dns_search: []
+    dns_opt:
+      - ndots:1
+
+    # ── Límites de recursos ────────────────────────────────────────────────
+    ulimits:
+      # Necesario para masscan y herramientas de alta concurrencia
+      nofile:
+        soft: 65536
+        hard: 65536
+
+    # ── Política de reinicio ───────────────────────────────────────────────
+    # Un contenedor de pentesting NUNCA debe auto-reiniciarse
+    restart: "no"
+
+    # ── Healthcheck básico ─────────────────────────────────────────────────
+    healthcheck:
+      test: ["CMD", "which", "claude"]
+      interval: 30s
+      timeout: 5s
+      retries: 1
+      start_period: 10s
+
+# ── Volúmenes nombrados ───────────────────────────────────────────────────────
+volumes:
+  # Configuración de Claude Code (preferencias, historial de sesión)
+  offsec-claude-config:
+    driver: local
+
+# ── Redes ─────────────────────────────────────────────────────────────────────
+networks:
+  offsec-net:
+    driver: bridge
+    driver_opts:
+      # Nombre de interfaz personalizado en el host para fácil identificación
+      com.docker.network.bridge.name: offsec0
+    ipam:
+      driver: default
+      config:
+        # Subred dedicada — evita conflictos con redes del engagement
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1

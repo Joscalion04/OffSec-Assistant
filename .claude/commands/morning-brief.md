@@ -9,22 +9,22 @@ Pasos:
 3. Construye el briefing con este formato:
 
 ---
-## ☀️ OffSec Brief — [FECHA HOY]
+## OffSec Brief — [FECHA HOY]
 
 ### Engagements activos: X
 
 ---
-### 📁 [NOMBRE ENGAGEMENT]
+### [NOMBRE ENGAGEMENT]
 - **Cliente:** X | **Deadline:** YYYY-MM-DD ([N] días restantes)
 - **Fase:** X | **Progreso:** X%
 - **Último trabajo:** [resumen de última sesión]
 - **Pendientes de hoy:**
   - [ ] tarea 1
   - [ ] tarea 2
-- **Alerta:** ⚠️ (si el deadline es en menos de 3 días)
+- **Alerta:** [!] DEADLINE PROXIMO (si el deadline es en menos de 3 días)
 
 ---
-### 🎯 Foco recomendado para hoy
+### Foco recomendado para hoy
 [Un solo engagement o tarea específica, con justificación]
 
 4. Si no hay engagements activos, indica cómo crear uno con /new-engagement

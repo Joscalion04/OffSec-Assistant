@@ -11,3 +11,11 @@ logs/
 reports/
 findings/
 
+# Docker — credenciales y VPN nunca al repo
+*.ovpn
+*.key
+*.pem
+*.p12
+docker/vpn/*.conf
+.claude/settings.local.json
+

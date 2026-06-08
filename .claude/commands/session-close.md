@@ -7,7 +7,7 @@ Pasos:
 2. Lee los logs de hoy en logs/session_YYYY-MM-DD.log
 3. Genera un resumen de sesión:
 
-## 📋 Resumen de sesión — [FECHA] — [ENGAGEMENT]
+## Resumen de sesión — [FECHA] — [ENGAGEMENT]
 - **Duración estimada:** [basado en timestamps del log]
 - **Fase trabajada:** X
 - **Comandos ejecutados:** N
@@ -26,4 +26,4 @@ Pasos:
 5. Hace commit en git del engagement:
    cd findings/[engagement] && git add . && git commit -m "session: [FECHA] — [resumen en una línea]"
 
-6. Confirma: "✅ Sesión cerrada. Próxima sesión recomendada: [próximo paso concreto]"
+6. Confirma: "Sesión cerrada. Próxima sesión recomendada: [próximo paso concreto]"

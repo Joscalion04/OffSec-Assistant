@@ -6,14 +6,17 @@
 - **Progreso general:** 0%
 
 ## Superficie de ataque identificada
-| Host | IP | Puertos abiertos | Tecnologías | Notas |
+<!-- DLP: usar tokens del mapa (TGT-001, HST-001) — NUNCA IPs o hostnames reales -->
+| Host | IP | Puertos abiertos | Tecnologias | Notas |
 |---|---|---|---|---|
-| | | | | |
+| HST-001 | TGT-001 | | | |
 
 ## Credenciales encontradas
-| Servicio | Usuario | Contraseña/Hash | Válida | Origen |
-|---|---|---|---|---|
-| | | | | |
+<!-- DLP: NUNCA escribir credenciales reales — solo referencias al almacen local -->
+<!-- Guardar credenciales reales en: evidence/credentials.txt (local, gitignored) -->
+| Servicio | Usuario | Estado | Origen |
+|---|---|---|---|
+| | USR-001 | Valida/Invalida | FIND-001 |
 
 ## Hipótesis activas
 - [ ] [Hipótesis 1 — qué creés que es explotable y por qué]

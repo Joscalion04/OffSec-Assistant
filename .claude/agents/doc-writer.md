@@ -33,5 +33,5 @@ Después de cada hallazgo o decisión importante:
 
 ## Formato de output
 Siempre indicás qué archivos creaste o modificaste al final:
-- ✅ Creado: findings/FECHA_engagement/vulns/FIND-001_sqli-login.md
-- 🔄 Actualizado: findings/FECHA_engagement/context.md
+- [CREADO]      findings/FECHA_engagement/vulns/FIND-001_sqli-login.md
+- [ACTUALIZADO] findings/FECHA_engagement/context.md

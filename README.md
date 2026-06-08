@@ -5,177 +5,186 @@
 
 [![License](https://img.shields.io/badge/license-Ethical%20Use%201.0-red)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue)](CHANGELOG.md)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Arch%2FManjaro-lightgrey)]()
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Docker-lightgrey)]()
 [![Claude Code](https://img.shields.io/badge/powered%20by-Claude%20Code-orange)](https://claude.ai/code)
+
+**[Manual de usuario completo](MANUAL.md)** — instalacion paso a paso, flujo de engagement, DLP y referencia de comandos.
 
 ---
 
-## ¿Qué es OffSec Assistant?
+## Que es OffSec Assistant
 
-OffSec Assistant es un agente de inteligencia artificial para seguridad ofensiva que se ejecuta
-dentro de [Claude Code](https://claude.ai/code). No es un simple script que lanza herramientas
-en secuencia: es un sistema de agentes especializados que acompaña al operador en cada fase de
-un engagement de pentesting, razona junto a él cuando está trabado, documenta hallazgos
-automáticamente y genera reportes profesionales.
+OffSec Assistant es un agente de inteligencia artificial para seguridad ofensiva que corre
+dentro de [Claude Code](https://claude.ai/code). No es un script que lanza herramientas en
+secuencia: es un sistema de agentes especializados que acompana al operador en cada fase de
+un engagement, razona junto a el cuando esta trabado, documenta hallazgos automaticamente y
+genera reportes profesionales.
 
 ### El problema que resuelve
 
-Un pentester experimentado pasa una fracción importante de su tiempo en tareas mecánicas:
+Un pentester experimentado pasa una fraccion importante de su tiempo en tareas mecanicas:
 organizar carpetas, documentar hallazgos, correlacionar CVEs, escribir reportes.
 OffSec Assistant automatiza esa capa operativa para que el operador se concentre en el
-razonamiento ofensivo — la parte que realmente importa.
+razonamiento ofensivo, la parte que realmente importa.
 
-### Principios de diseño
+### Principios de diseno
 
 - **Seguridad por defecto**: Nunca ejecuta herramientas activas sin `scope.md`. Nunca lanza
-  exploits sin confirmación explícita del operador.
-- **Transparente**: Cada decisión del agente se explica antes de ejecutarse. Sin cajas negras.
-- **Auditable**: Cada comando Bash se loguea en `logs/session_YYYY-MM-DD.log`. Cada engagement
+  exploits sin confirmacion explicita del operador.
+- **Transparente**: Cada decision del agente se explica antes de ejecutarse. Sin cajas negras.
+- **Auditable**: Cada comando se loguea en `logs/session_YYYY-MM-DD.log`. Cada engagement
   tiene su propio repositorio git con commits por fase.
 - **Operador primero**: El agente propone, el operador decide. Siempre.
 
 ---
 
-## Características
+## Caracteristicas
 
-### Gestión de engagements
-- Inicialización automática de estructura de carpetas y git por engagement
+### Gestion de engagements
+- Inicializacion automatica de estructura de carpetas y git por engagement
 - `context.md` como cerebro vivo del engagement (estado, hallazgos, vectores pendientes)
 - Morning brief diario con estado de todos los engagements activos
-- Cierre de sesión con commit automático y resumen de sesión
+- Cierre de sesion con commit automatico y resumen
 
 ### Fases de pentesting
 | Fase | Comando | Herramientas |
 |------|---------|-------------|
 | Reconocimiento | `/recon <target>` | nmap, WHOIS, dig, subfinder, theHarvester, WhatWeb |
-| Análisis de vulnerabilidades | `/vuln-scan <target>` | nmap NSE, Nikto, Nuclei, searchsploit |
-| Explotación | `/exploit <target>` | Metasploit, sqlmap — siempre con confirmación |
+| Analisis de vulnerabilidades | `/vuln-scan <target>` | nmap NSE, Nikto, Nuclei, searchsploit |
+| Explotacion | `/exploit <target>` | Metasploit, sqlmap — siempre con confirmacion |
 
-### Modo autónomo (`-auto`)
-Disponible en `/recon`, `/vuln-scan` y `/exploit`. El agente ejecuta la fase completa,
-toma decisiones basadas en resultados intermedios y escribe un live feed en tiempo real:
-
-```bash
-tail -f ~/Documents/OffSec/OffSec-Assistant/logs/livefeed/<archivo>.log
-```
+### Modo autonomo (-auto)
+Ejecuta la fase completa sin interrupciones con live feed en tiempo real.
+El agente toma decisiones basadas en resultados intermedios y actualiza `context.md` al terminar.
 
 ### Sistema de agentes
 | Agente | Rol |
 |--------|-----|
-| `decision-advisor` | Razona problemas ofensivos en voz alta, da UNA recomendación concreta |
-| `doc-writer` | Pre-llena findings con CVSS 3.1 automáticamente al detectar output relevante |
-| `penetration-tester` | Agente principal de ejecución de fases |
+| `decision-advisor` | Razona problemas ofensivos, da una recomendacion concreta |
+| `doc-writer` | Pre-llena findings con CVSS 3.1 al detectar output relevante |
+| `penetration-tester` | Agente principal de ejecucion de fases |
 
-### Documentación y reportes
-- Findings en formato estructurado con CVSS 3.1, CVE, CWE, pasos de reproducción y remediación
-- Reporte final: Executive Summary (no técnico) + sección técnica completa en español
-- Generación con `/report <engagement>`
+### Documentacion y reportes
+- Findings estructurados con CVSS 3.1, CVE, CWE, reproduccion y remediacion
+- Reporte final: Executive Summary + seccion tecnica completa en espanol
+
+### Contenedor Docker
+Imagen autocontenida basada en Kali Linux con todo el stack de pentesting incluido.
+No depende de herramientas del host. Soporta OpenVPN y WireGuard de forma nativa.
+Ver [Instalacion con Docker](#instalacion-con-docker) o el [Manual de usuario](MANUAL.md#2-instalacion-y-configuracion).
+
+### Control DLP (Data Loss Prevention)
+Sistema de tokenizacion que protege los datos del cliente/target antes de que lleguen
+al agente de IA y por ende a la API de Anthropic.
+
+- **IPs reales** (`192.168.1.50`) se reemplazan por tokens (`TGT-001`) antes de cada log
+- **Hostnames y FQDNs** se tokenizan como `HST-001`, `HST-002`, etc.
+- **Nombres de organizacion** (de WHOIS, certificados) se tokenizan como `ORG-001`
+- **Credenciales** (passwords, hashes, tokens) se redactan completamente: `[CREDENTIAL-REDACTED]`
+- El mapa token-valor real vive en `findings/<engagement>/dlp-map.json`, es local y gitignored
+- Los scripts de scanning usan valores reales para ejecutar herramientas pero logs sanitizados
+  para el agente: la herramienta ve la IP, el agente ve el token
 
 ---
 
 ## Requisitos
 
-### Sistema
+### Modo nativo
+
 - Linux (Arch/Manjaro recomendado; compatible con cualquier distro con bash)
 - [Claude Code](https://claude.ai/code) instalado y autenticado
+- Herramientas de pentesting (ver tabla completa en el [manual](MANUAL.md#21-modo-nativo))
 
-### Herramientas de seguridad
-
-Verificar estado con `/check-tools`:
-
-| Categoría | Herramientas |
-|-----------|-------------|
-| Reconocimiento | `nmap`, `masscan`, `amass`, `subfinder`, `theHarvester` |
-| Web | `ffuf`, `nikto`, `sqlmap`, `nuclei`, `whatweb`, `gobuster` |
-| Explotación | `metasploit`, `searchsploit` |
-| Post-explotación | `netcat`, `socat`, `linpeas`, `winpeas` |
-| Utilidades | `git`, `python3`, `curl`, `wget`, `jq`, `whois`, `dig` |
-
-Instalación en Arch/Manjaro:
+Instalacion rapida en Arch/Manjaro:
 ```bash
 sudo pacman -S nmap masscan nikto sqlmap whatweb gobuster netcat socat git python curl wget jq whois bind
 yay -S amass subfinder theHarvester nuclei ffuf
 ```
 
+### Modo Docker
+
+- Docker >= 24.0 y Docker Compose >= 2.20
+- API key de Anthropic (`ANTHROPIC_API_KEY`)
+- Sin dependencias adicionales — todo el stack esta en la imagen
+
 ---
 
-## Instalación
+## Instalacion rapida
+
+### Modo nativo
 
 ```bash
 git clone https://github.com/Joscalion04/OffSec-Assistant.git
 cd OffSec-Assistant
-claude   # Abrir en Claude Code
+claude
 ```
 
-No hay dependencias de instalación adicionales. Todo el sistema se basa en instrucciones
-para Claude Code (`CLAUDE.md`, `.claude/commands/`, `.claude/agents/`).
+### Modo Docker
+
+```bash
+git clone https://github.com/Joscalion04/OffSec-Assistant.git
+cd OffSec-Assistant
+
+# Configurar API key
+cp .env.example .env
+# Editar .env: ANTHROPIC_API_KEY=sk-ant-...
+
+# Construir y ejecutar
+docker compose build
+docker compose run --rm assistant
+```
+
+Para instrucciones detalladas de cada modo (Docker con VPN, con Metasploit, persistencia
+de datos, troubleshooting) ver el **[Manual de usuario](MANUAL.md)**.
 
 ---
 
-## Inicio rápido
+## Flujo de trabajo estandar
 
 ```bash
-# 1. Verificar herramientas disponibles
-/check-tools
+# Inicio del dia
+/morning-brief
 
-# 2. Crear un nuevo engagement
+# Crear engagement
 /new-engagement acme-corp-2026
 
-# 3. Editar scope.md con los targets autorizados
-# (obligatorio antes de cualquier acción activa)
+# Completar scope.md con los targets autorizados (obligatorio)
+# Luego inicializar proteccion DLP
+python3 tools/sanitizer.py findings/2026-06-08_acme-corp-2026 --init
 
-# 4. Reconocimiento
-/recon 192.168.1.50
+# Fases de pentesting
+/recon 192.168.10.50 -auto
+/vuln-scan 192.168.10.50
+/exploit 192.168.10.50
 
-# 5. Análisis de vulnerabilidades
-/vuln-scan 192.168.1.50
-
-# 6. Explotación (requiere confirmación explícita)
-/exploit 192.168.1.50
-
-# 7. Cerrar sesión
+# Fin del dia
 /session-close acme-corp-2026
-
-# 8. Generar reporte final
 /report acme-corp-2026
 ```
 
+El [Manual de usuario](MANUAL.md#4-flujo-de-engagement-completo) cubre cada paso
+con ejemplos, modos interactivo y autonomo, y consideraciones DLP.
+
 ---
 
-## Comandos de referencia
+## Comandos de referencia rapida
 
-### Gestión de engagements
-| Comando | Descripción |
+| Comando | Descripcion |
 |---------|-------------|
 | `/new-engagement <nombre>` | Inicializa estructura completa del engagement |
-| `/status [engagement]` | Estado actual: fases, hallazgos, próximo paso |
-| `/morning-brief` | Resumen de todos los engagements activos |
-| `/session-close [engagement]` | Cierra sesión, commit git, genera resumen |
-
-### Fases de pentesting
-| Comando | Descripción |
-|---------|-------------|
+| `/morning-brief` | Briefing diario de todos los engagements activos |
+| `/status [engagement]` | Estado actual: fases, hallazgos, proximo paso |
+| `/session-close [engagement]` | Cierra sesion, commit git, resumen |
 | `/recon <target> [-auto]` | Reconocimiento pasivo y activo |
-| `/vuln-scan <target> [-auto]` | Análisis de vulnerabilidades |
-| `/exploit <target> [-auto]` | Propuesta de explotación (siempre pide confirmación) |
-
-### Asistencia inteligente
-| Comando | Descripción |
-|---------|-------------|
-| `/think <situación>` | Razonamiento guiado cuando estás trabado |
-| `/explain <CVE o técnica>` | Explicación técnica contextualizada |
-| `/livefeed` | Cómo seguir ejecución autónoma en otra terminal |
-
-### Reportes y utilidades
-| Comando | Descripción |
-|---------|-------------|
-| `/report <engagement>` | Genera reporte ejecutivo + técnico completo |
+| `/vuln-scan <target> [-auto]` | Analisis de vulnerabilidades |
+| `/exploit <target> [-auto]` | Vectores de explotacion (confirmacion obligatoria) |
+| `/think <situacion>` | Razonamiento guiado cuando estas trabado |
+| `/explain <CVE o tecnica>` | Explicacion tecnica contextualizada |
+| `/report <engagement>` | Reporte ejecutivo y tecnico completo |
 | `/check-tools` | Verifica herramientas instaladas |
-| `/help [comando]` | Ayuda general o detallada de un comando |
+| `/help [comando]` | Ayuda general o detallada |
 
-### Flag `-auto`
-Disponible en `/recon`, `/vuln-scan`, `/exploit`. Ejecuta la fase de forma autónoma.
-`/exploit -auto` siempre solicita confirmación antes de ejecutar, sin excepción.
+Para descripcion completa de cada comando con ejemplos ver [Manual — Referencia de comandos](MANUAL.md#8-referencia-de-comandos).
 
 ---
 
@@ -183,176 +192,118 @@ Disponible en `/recon`, `/vuln-scan`, `/exploit`. Ejecuta la fase de forma autó
 
 ```
 OffSec-Assistant/
-├── .claude/
-│   ├── agents/
-│   │   ├── decision-advisor.md     # Agente de razonamiento ofensivo
-│   │   ├── doc-writer.md           # Agente de documentación automática
-│   │   └── penetration-tester.md  # Agente principal de pentesting
-│   └── commands/                   # Slash commands del sistema
-│       ├── check-tools.md
-│       ├── explain.md
-│       ├── exploit.md
-│       ├── help.md
-│       ├── livefeed.md
-│       ├── morning-brief.md
-│       ├── new-engagement.md
-│       ├── recon.md
-│       ├── report.md
-│       ├── session-close.md
-│       ├── status.md
-│       ├── think.md
-│       └── vuln-scan.md
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.md
-│   │   └── feature_request.md
-│   └── pull_request_template.md
-├── findings/                        # [gitignored] Engagements activos
-│   └── YYYY-MM-DD_<nombre>/
-│       ├── scope.md                 # Targets autorizados — EDITAR PRIMERO
-│       ├── context.md               # Cerebro vivo del engagement
-│       ├── finding_template.md
-│       ├── recon/
-│       ├── vulns/
-│       ├── exploitation/
-│       ├── post-exploitation/
-│       ├── evidence/
-│       └── notes/
-├── logs/                            # [gitignored] Logs de sesión y live feed
-├── reports/                         # [gitignored] Reportes generados
-├── templates/
-│   ├── context.md                   # Plantilla de contexto de engagement
-│   ├── finding.md                   # Plantilla de hallazgo (CVSS 3.1)
-│   └── scope.md                     # Plantilla de scope
-├── tools/
-│   ├── auto-runner.sh               # Orquestador de ejecución autónoma
-│   ├── logger.sh                    # Sistema de logging de sesión
-│   ├── run-recon.sh                 # Runner de fase de reconocimiento
-│   └── run-vuln-scan.sh             # Runner de fase de vuln-scan
-├── wordlists/                       # Wordlists custom (sistema usa /usr/share/wordlists/)
-├── CHANGELOG.md
-├── CLAUDE.md                        # Identidad y comportamiento del agente
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-├── SECURITY.md
-└── scope.md                         # Scope global (referencias generales)
+|-- .claude/
+|   |-- agents/
+|   |   |-- decision-advisor.md
+|   |   |-- doc-writer.md
+|   |   `-- penetration-tester.md
+|   `-- commands/
+|       `-- [check-tools, explain, exploit, help, livefeed,
+|            morning-brief, new-engagement, recon, report,
+|            session-close, status, think, vuln-scan].md
+|-- docker/
+|   |-- entrypoint.sh
+|   `-- vpn/              <- configs VPN (gitignored)
+|-- findings/             <- [gitignored] engagements activos
+|   `-- YYYY-MM-DD_<nombre>/
+|       |-- scope.md      <- targets autorizados (editar primero)
+|       |-- context.md    <- estado vivo del engagement
+|       |-- dlp-map.json  <- mapa DLP local (gitignored)
+|       |-- recon/
+|       |-- vulns/
+|       |-- exploitation/
+|       |-- post-exploitation/
+|       |-- evidence/
+|       `-- notes/
+|-- logs/                 <- [gitignored] sesion y livefeed
+|-- reports/              <- [gitignored] reportes generados
+|-- templates/            <- scope, context, finding
+|-- tools/
+|   |-- auto-runner.sh    <- motor de ejecucion autonoma + DLP
+|   |-- logger.sh
+|   |-- run-recon.sh      <- fase de reconocimiento con DLP integrado
+|   |-- run-vuln-scan.sh  <- fase de vuln-scan con DLP integrado
+|   `-- sanitizer.py      <- motor DLP: tokenizacion de datos sensibles
+|-- .dockerignore
+|-- .env.example
+|-- CHANGELOG.md
+|-- CLAUDE.md             <- identidad, comportamiento y reglas DLP del agente
+|-- CONTRIBUTING.md
+|-- docker-compose.full.yml
+|-- docker-compose.yml
+|-- Dockerfile            <- multi-stage: lite y full
+|-- MANUAL.md             <- guia de usuario completa
+|-- README.md
+|-- SECURITY.md
+`-- scope.md
 ```
+
+---
+
+## Funcionalidades pendientes
+
+### Optimizacion
+
+- Cache de reconocimiento para evitar re-escaneos identicos entre sesiones
+- Procesamiento paralelo de multiples targets con control de concurrencia
+- Base de datos local de CVEs para correlacion offline sin conectividad externa
+- Compresion automatica de evidencias de engagements cerrados
+- Perfiles de escaneo configurables (silencioso, estandar, agresivo)
+
+### Gobernanza
+
+- Cadena de custodia de evidencias con hash SHA-256 automatico al momento de captura
+- Audit trail estructurado en JSON compatible con SIEMs
+- Modo revision read-only para auditorias internas sin ejecucion
+- Control de versiones de templates con migracion automatica de engagements activos
+- Firma digital de reportes finales para garantizar integridad ante el cliente
+
+### Seguridad operativa
+
+- Pipeline CI con Trivy: escaneo de imagen Docker en cada push, bloqueo en CVEs criticos
+- Firmado de imagen con cosign/sigstore para verificacion de origen
+- Integracion con HashiCorp Vault para rotacion de API key y credenciales VPN
+- Cifrado at-rest del directorio `findings/` con age/gpg, descifrado solo en runtime
+- Network policy para restringir egress del contenedor a IPs del scope declarado
+- Perfiles AppArmor/Seccomp especificos para el contenedor
+
+### Seguridad ofensiva
+
+- Modulo Active Directory: BloodHound/SharpHound, attack paths automaticos
+- Parsing automatico de linpeas/winpeas con findings preformateados
+- Integracion con Burp Suite API para web testing desde el agente
+- Mapeo automatico de tecnicas a MITRE ATT&CK en cada hallazgo documentado
+- Integracion con plataformas CTF: HackTheBox API, TryHackMe
+- Modulo de threat intelligence con MISP u OpenCTI
+- Soporte multi-engagement simultaneo con dashboard unificado
+- Generacion de payloads contextuales adaptados al entorno detectado
 
 ---
 
 ## Contribuir
 
-Las contribuciones son bienvenidas. Lee [CONTRIBUTING.md](CONTRIBUTING.md) para el
-proceso completo. Resumen:
+Lee [CONTRIBUTING.md](CONTRIBUTING.md) para el proceso completo.
 
-1. Fork del repositorio
-2. Crear rama desde `develop`: `git checkout -b feat/mi-nueva-funcionalidad`
-3. Commits con formato Conventional Commits (ver abajo)
-4. PR apuntando a `develop` con la plantilla completa
-5. Code review y merge por el mantenedor
+Este proyecto sigue [Conventional Commits](https://www.conventionalcommits.org/).
+Tipos principales: `feat`, `fix`, `docs`, `chore`, `refactor`, `agent`, `template`,
+`recon`, `vuln`, `exploit`, `report`, `docker`.
 
-### Formato de commits
-
-Este proyecto sigue [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<tipo>(<scope>): <descripción en presente, minúsculas>
-```
-
-**Tipos principales:**
-
-| Tipo | Uso |
-|------|-----|
-| `feat` | Nueva funcionalidad o comando |
-| `fix` | Corrección de bug |
-| `docs` | Solo documentación |
-| `chore` | Mantenimiento y tareas de infraestructura |
-| `refactor` | Reestructuración sin cambio de comportamiento |
-| `agent` | Cambios en agentes del sistema |
-| `template` | Cambios en plantillas |
-| `recon` | Cambios en fase de reconocimiento |
-| `vuln` | Cambios en fase de vuln-scan |
-| `exploit` | Cambios en fase de explotación |
-| `report` | Cambios en sistema de reportes |
-
-**Ejemplos:**
-```bash
-feat(commands): agregar flag --format json en /report
-fix(agents): corregir doc-writer que no generaba campo CVSS correctamente
-docs(readme): agregar sección de instalación en Debian/Ubuntu
-agent(decision-advisor): mejorar razonamiento para casos de AD enumeration
-template(finding): agregar campo EPSS score
-```
-
-**Breaking changes** se documentan en el footer del commit:
-```
-feat(commands): cambiar estructura de scope.md
-
-BREAKING CHANGE: el campo `targets` ahora requiere sub-campo `authorization_date`.
-```
+**Criterios de rechazo automatico de PRs:**
+- Debilita o elimina el gate de scope
+- Elimina la confirmacion obligatoria en `/exploit`
+- Modifica la LICENSE para reducir restricciones de uso etico
 
 ---
 
-## Control de versiones
+## Aviso legal y uso etico
 
-Este proyecto sigue [Semantic Versioning](https://semver.org/):
+**Este software esta disenado exclusivamente para seguridad ofensiva autorizada.**
 
-```
-MAJOR.MINOR.PATCH
-```
+Solo esta permitido usarlo contra sistemas para los cuales el usuario tenga
+**autorizacion escrita explicita** del propietario. El uso no autorizado es ilegal
+y viola los terminos de la [Licencia](LICENSE).
 
-| Incremento | Cuándo |
-|-----------|--------|
-| `MAJOR` | Cambios incompatibles con versiones anteriores (estructura de archivos, contratos de agentes) |
-| `MINOR` | Nuevas funcionalidades retrocompatibles (nuevos comandos, nuevos agentes) |
-| `PATCH` | Correcciones de bugs y mejoras menores retrocompatibles |
-
-Los releases se documentan en [CHANGELOG.md](CHANGELOG.md) siguiendo
-[Keep a Changelog](https://keepachangelog.com/).
-
-### Estrategia de ramas
-
-```
-main ──────────────────────────────────── (releases estables, etiquetados)
-         ↑ merge release
-develop ──────────────────────────────── (integración continua)
-    ↑ merge PRs
-feature/* / fix/* / docs/* / chore/*     (ramas de trabajo)
-```
-
----
-
-## Flujo de trabajo de PRs
-
-1. El PR se abre contra `develop` usando la plantilla en `.github/pull_request_template.md`
-2. El autor completa el checklist de la plantilla
-3. Code review por al menos un mantenedor en ≤ 5 días hábiles
-4. Feedback incorporado por el autor
-5. Merge por el mantenedor (squash si hay commits de WIP; merge commit si son commits limpios)
-6. Los cambios en `develop` se agrupan en un release y se fusionan a `main` con tag de versión
-
-**Criterios de rechazo automático:**
-- El PR debilita o elimina el gate de scope
-- El PR elimina la confirmación obligatoria en `/exploit`
-- El PR modifica la LICENSE para reducir las restricciones de uso ético
-- El PR no tiene descripción del cambio
-
----
-
-## Aviso legal y uso ético
-
-**Este software está diseñado exclusivamente para seguridad ofensiva autorizada.**
-
-Solo está permitido usar OffSec Assistant contra sistemas, redes o aplicaciones para
-los cuales el usuario tenga **autorización escrita explícita** del propietario del sistema.
-Cualquier uso no autorizado es ilegal y viola los términos de la [Licencia](LICENSE).
-
-El uso de esta herramienta para actividades ilegales, no autorizadas, o con fines de
-daño es responsabilidad exclusiva del usuario. Los autores no asumen ninguna responsabilidad
-por mal uso.
-
-Casos de uso legítimos: engagements de pentesting con contrato, CTF, laboratorios propios,
+Casos de uso legitimos: engagements con contrato, CTF, laboratorios propios,
 bug bounty dentro del scope declarado por el programa.
 
 ---
@@ -361,12 +312,11 @@ bug bounty dentro del scope declarado por el programa.
 
 OffSec Assistant Ethical Use License 1.0 — ver [LICENSE](LICENSE).
 
-Open source con restricciones:
-- Uso no comercial permitido libremente
-- Uso comercial requiere autorización escrita previa del autor
-- Uso ético obligatorio — uso contra sistemas no autorizados viola la licencia
+- Uso no comercial: permitido libremente
+- Uso comercial: requiere autorizacion escrita previa del autor
+- Uso etico: obligatorio — uso contra sistemas no autorizados viola la licencia
 
-Contacto para uso comercial o preguntas sobre la licencia: joscalion04@gmail.com
+Contacto: joscalion04@gmail.com
 
 ---
 
@@ -377,4 +327,4 @@ Contacto para uso comercial o preguntas sobre la licencia: joscalion04@gmail.com
 ---
 
 *OffSec Assistant es una herramienta para profesionales de seguridad responsables.*
-*Úsala bien.*
+*Usala bien.*

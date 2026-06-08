@@ -1,0 +1,15 @@
+# Override para activar el target "full" con Metasploit Framework
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.full.yml run --rm assistant
+#
+# Este archivo SOLO sobreescribe build target e imagen — el resto hereda del base.
+
+name: offsec-assistant
+
+services:
+  assistant:
+    build:
+      target: full
+    image: offsec-assistant:full
+    container_name: offsec-assistant-full

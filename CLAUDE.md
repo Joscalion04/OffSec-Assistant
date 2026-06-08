@@ -43,14 +43,24 @@ Cuando ejecutés una herramienta y haya output relevante, delegá al agente doc-
 para pre-llenar el finding.md sin que el operador tenga que pedirlo.
 
 ## Sistema de archivos
-- **Base:** /home/joseph/Documents/OffSec/OffSec-Assistant/
-- **Engagements:** findings/YYYY-MM-DD_<nombre>/
-- **Contexto vivo:** findings/YYYY-MM-DD_<nombre>/context.md
-- **Reportes:** reports/
-- **Logs de sesión:** logs/session_YYYY-MM-DD.log
-- **Plantillas:** templates/
-- **Wordlists:** /usr/share/wordlists/
-- **Herramientas custom:** tools/
+
+La ruta base del proyecto se determina en runtime mediante la variable OFFSEC_HOME:
+- En Docker: inyectada por el contenedor como OFFSEC_HOME=/workspace
+- En host: derivada del directorio donde esta abierto Claude Code ($(pwd))
+
+Nunca uses rutas absolutas con /home/... ni /workspace/... en comandos o documentacion.
+Siempre usa la variable:
+  OFFSEC_HOME="${OFFSEC_HOME:-$(pwd)}"
+
+Estructura relativa a OFFSEC_HOME:
+- **Engagements:** $OFFSEC_HOME/findings/YYYY-MM-DD_<nombre>/
+- **Contexto vivo:** $OFFSEC_HOME/findings/YYYY-MM-DD_<nombre>/context.md
+- **Reportes:** $OFFSEC_HOME/reports/
+- **Logs de sesión:** $OFFSEC_HOME/logs/session_YYYY-MM-DD.log
+- **Plantillas:** $OFFSEC_HOME/templates/
+- **Wordlists:** /usr/share/wordlists/ (path del sistema, no del proyecto)
+- **Herramientas custom:** $OFFSEC_HOME/tools/
+- **Sanitizador DLP:** $OFFSEC_HOME/tools/sanitizer.py
 
 ## Stack de herramientas
 - Reconocimiento: nmap, masscan, amass, subfinder, theHarvester
@@ -70,3 +80,68 @@ para pre-llenar el finding.md sin que el operador tenga que pedirlo.
 - Commits después de cada fase: "recon: completado", "vuln: FIND-001 documentado"
 - Logging automático de cada comando Bash en logs/session_YYYY-MM-DD.log
 - No es necesario logear manualmente
+
+## Control de DLP (Data Loss Prevention)
+
+### Por qué existe este control
+Cualquier dato que el agente procesa puede ser transmitido a la API de Anthropic.
+Para proteger la información del cliente/target, ningún dato sensible del engagement
+debe llegar al contexto del agente en forma cruda.
+
+### Qué se considera dato sensible
+- Direcciones IP reales del target (incluso privadas como 192.168.x.x)
+- Hostnames, FQDNs y subdominios del target
+- Nombres de organizaciones/clientes (de WHOIS, certificados TLS, etc.)
+- Credenciales encontradas: usuarios, contraseñas, hashes, tokens, API keys
+- Contenido de bases de datos, archivos con PII o datos de negocio
+- Emails de contacto del cliente o del target
+
+### Protocolo obligatorio — ejecución de herramientas
+NUNCA ejecutes un comando y leas su output crudo directamente en el contexto.
+
+Protocolo correcto:
+1. Ejecutar la herramienta y guardar output en archivo del engagement:
+   `nmap [...] > findings/<engagement>/recon/nmap_ports.txt`
+2. Sanitizar el archivo antes de analizarlo:
+   `python3 tools/sanitizer.py <engagement_dir> findings/<engagement>/recon/nmap_ports.txt`
+3. Leer y analizar SOLO el output sanitizado del paso 2.
+4. El archivo raw permanece en disco para referencia local del operador.
+
+Atajo para comando + sanitizar en una sola operacion:
+```bash
+nmap -sV $TGT_REAL -oN /tmp/scan_raw.txt && \
+python3 tools/sanitizer.py findings/<engagement>_dir /tmp/scan_raw.txt
+```
+
+### Protocolo — lectura de archivos del engagement
+Cuando necesites leer un archivo de findings (nmap, nikto, etc.):
+- NUNCA usar: `cat findings/<engagement>/recon/nmap_ports.txt`
+- SIEMPRE usar:
+  `python3 tools/sanitizer.py <engagement_dir> findings/<engagement>/recon/nmap_ports.txt`
+
+Excepcion: los archivos context.md y finding_*.md deben estar escritos ya con tokens,
+no con datos crudos. Si encontras datos crudos en esos archivos, sanitizalos antes
+de leerlos.
+
+### Protocolo — escritura en context.md y findings
+Al documentar hallazgos SIEMPRE usa los tokens del mapa DLP:
+- CORRECTO:   "TGT-001 tiene puerto 445 abierto con SMB"
+- INCORRECTO: "192.168.1.50 tiene puerto 445 abierto con SMB"
+
+El operador puede consultar el mapa para ver la correspondencia real:
+`cat findings/<engagement>/dlp-map.json`
+
+### Protocolo — respuestas al operador
+En tus respuestas, recomendaciones y análisis:
+- Siempre usa tokens (TGT-001, HST-002, ORG-001) en lugar de valores reales
+- Si el operador te pasa un IP o hostname real en el prompt, reconocelo y pedile
+  que use el token correspondiente para mantener la consistencia del mapa
+- Nunca repitas credenciales, hashes ni datos de negocio extraidos
+
+### Mapa DLP del engagement
+- Ubicación: `findings/<engagement>/dlp-map.json`
+- Inicialización: se genera automáticamente al crear el engagement y al correr
+  el primer scan (via --init desde scope.md)
+- NUNCA leas, muestres ni incluyas el contenido de dlp-map.json en tus respuestas.
+  Es un artefacto local del operador, no del agente.
+- Si necesitas saber el token de un valor: `python3 tools/sanitizer.py <dir> <<< "192.168.1.50"`

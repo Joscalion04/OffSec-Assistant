@@ -1,0 +1,5 @@
+# Ignorar TODOS los archivos de configuración VPN
+# Los configs se montan en runtime, NUNCA se commitean al repositorio
+*
+!.gitignore
+!.gitkeep
