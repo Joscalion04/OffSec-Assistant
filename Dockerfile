@@ -109,10 +109,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Capa 4c: Python venv — paquetes estables ─────────────────────────────
-# Separado de netexec para que el log CI muestre exactamente qué falla
+# --prefer-binary: usa wheels precompilados y evita compilar desde source.
+# Necesario para impacket→cryptography (requiere Rust desde v42) y netexec.
 RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/venv/bin/pip install --no-cache-dir \
+    && /opt/venv/bin/pip install --no-cache-dir --prefer-binary \
         impacket \
         ldapdomaindump \
         bloodhound \
@@ -120,9 +121,8 @@ RUN python3 -m venv /opt/venv \
         requests \
         dnspython
 
-# ── Capa 4d: netexec — separado por ser el más propenso a fallar ─────────
-# nxc (netexec) requiere compilación; si falla, revisar las build deps arriba
-RUN /opt/venv/bin/pip install --no-cache-dir netexec
+# ── Capa 4d: netexec ─────────────────────────────────────────────────────
+RUN /opt/venv/bin/pip install --no-cache-dir --prefer-binary netexec
 
 ENV PATH="/opt/venv/bin:$PATH"
 
