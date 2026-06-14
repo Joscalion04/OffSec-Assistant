@@ -1,0 +1,53 @@
+repos:
+  # ── Hooks básicos de higiene ──────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # ── Python: formato y lint ────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # ── Shell: análisis estático ──────────────────────────────────────────────
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  # ── YAML: lint ────────────────────────────────────────────────────────────
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yaml]
+
+  # ── Secretos: gitleaks (binario nativo — el hook wasm falla en Arch/Manjaro) ─
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: "Detect hardcoded secrets (gitleaks)"
+        language: system
+        entry: gitleaks
+        args: [git, --no-banner]
+        pass_filenames: false
+        always_run: true
+
+  # ── DLP: bloquear staging de dlp-map.json ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: block-dlp-map
+        name: "Block dlp-map.json staging"
+        language: script
+        entry: .git-hooks/check-dlp-map.sh
+        pass_filenames: true
+        types: [file]

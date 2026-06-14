@@ -34,10 +34,10 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Cliente HTTP mínimo (sin dependencias externas)
 # ---------------------------------------------------------------------------
+
 
 class BurpClient:
     def __init__(self, host: str, port: int, api_key: str):
@@ -53,7 +53,9 @@ class BurpClient:
         url = f"{self.base_url}{path}"
         data = json.dumps(body).encode() if body else None
 
-        req = urllib.request.Request(url, data=data, headers=self.headers, method=method)
+        req = urllib.request.Request(
+            url, data=data, headers=self.headers, method=method
+        )
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 raw = resp.read().decode()
@@ -78,6 +80,7 @@ class BurpClient:
 # Acciones
 # ---------------------------------------------------------------------------
 
+
 def cmd_status(client: BurpClient):
     """Verifica que Burp está corriendo y la API responde."""
     try:
@@ -101,7 +104,7 @@ def cmd_scan(client: BurpClient, target_url: str, config: dict = None) -> str:
         resp = client.post("/scan", payload)
         # Burp retorna el Location header con el ID, o lo incluye en el body
         scan_id = resp.get("id") or resp.get("task_id", "desconocido")
-        print(f"[BURP] Scan iniciado")
+        print("[BURP] Scan iniciado")
         print(f"  URL:     {target_url}")
         print(f"  Scan ID: {scan_id}")
         print(f"  Monitorear con: burp-api.py results {scan_id}")
@@ -164,35 +167,35 @@ def cmd_results(client: BurpClient, scan_id: str):
 
 
 BURP_SEVERITY_MAP = {
-    "high":          "High",
-    "medium":        "Medium",
-    "low":           "Low",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
     "informational": "Info",
-    "info":          "Info",
+    "info": "Info",
 }
 
 BURP_CVSS_ESTIMATE = {
-    "High":   "7.5",
+    "High": "7.5",
     "Medium": "5.0",
-    "Low":    "3.0",
-    "Info":   "1.0",
+    "Low": "3.0",
+    "Info": "1.0",
 }
 
 BURP_MITRE_MAP = {
-    "SQL injection":                   "T1190 — Exploit Public-Facing Application",
-    "Cross-site scripting":            "T1059.007 — JavaScript execution",
-    "XML injection":                   "T1190 — Exploit Public-Facing Application",
-    "OS command injection":            "T1059 — Command and Scripting Interpreter",
-    "Path traversal":                  "T1083 — File and Directory Discovery",
-    "SSRF":                            "T1190 — Exploit Public-Facing Application",
-    "CSRF":                            "T1185 — Browser Session Hijacking",
-    "Clickjacking":                    "T1185 — Browser Session Hijacking",
-    "Open redirect":                   "T1566.002 — Phishing: Spearphishing Link",
-    "Information disclosure":          "T1592 — Gather Victim Host Information",
-    "Authentication":                  "T1078 — Valid Accounts",
-    "Access control":                  "T1078 — Valid Accounts",
-    "File upload":                     "T1190 — Exploit Public-Facing Application",
-    "Deserialization":                 "T1190 — Exploit Public-Facing Application",
+    "SQL injection": "T1190 — Exploit Public-Facing Application",
+    "Cross-site scripting": "T1059.007 — JavaScript execution",
+    "XML injection": "T1190 — Exploit Public-Facing Application",
+    "OS command injection": "T1059 — Command and Scripting Interpreter",
+    "Path traversal": "T1083 — File and Directory Discovery",
+    "SSRF": "T1190 — Exploit Public-Facing Application",
+    "CSRF": "T1185 — Browser Session Hijacking",
+    "Clickjacking": "T1185 — Browser Session Hijacking",
+    "Open redirect": "T1566.002 — Phishing: Spearphishing Link",
+    "Information disclosure": "T1592 — Gather Victim Host Information",
+    "Authentication": "T1078 — Valid Accounts",
+    "Access control": "T1078 — Valid Accounts",
+    "File upload": "T1190 — Exploit Public-Facing Application",
+    "Deserialization": "T1190 — Exploit Public-Facing Application",
 }
 
 
@@ -227,14 +230,16 @@ def cmd_findings(client: BurpClient, scan_id: str, engagement_dir: str):
                 issues_by_type[issue_type] = {
                     "issue": issue,
                     "count": 0,
-                    "instances": []
+                    "instances": [],
                 }
             issues_by_type[issue_type]["count"] += 1
-            issues_by_type[issue_type]["instances"].append({
-                "url": issue.get("origin", "?"),
-                "path": issue.get("path", "?"),
-                "evidence": issue.get("evidence", []),
-            })
+            issues_by_type[issue_type]["instances"].append(
+                {
+                    "url": issue.get("origin", "?"),
+                    "path": issue.get("path", "?"),
+                    "evidence": issue.get("evidence", []),
+                }
+            )
 
         generated = []
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -246,8 +251,12 @@ def cmd_findings(client: BurpClient, scan_id: str, engagement_dir: str):
             severity = BURP_SEVERITY_MAP.get(severity_raw.lower(), "Info")
             cvss = BURP_CVSS_ESTIMATE[severity]
             confidence = issue.get("confidence", "tentative")
-            description = issue.get("issue_background", "Ver Burp Suite para detalle completo.")
-            remediation = issue.get("remediation_background", "Ver Burp Suite para recomendaciones.")
+            description = issue.get(
+                "issue_background", "Ver Burp Suite para detalle completo."
+            )
+            remediation = issue.get(
+                "remediation_background", "Ver Burp Suite para recomendaciones."
+            )
             mitre = _guess_mitre(name)
 
             # Instancias (sanitizadas — sin datos reales, solo estructura)
@@ -318,14 +327,20 @@ Exportar screenshots relevantes a evidence/screenshots/.
 # CLI principal
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Cliente CLI para Burp Suite Professional REST API"
     )
     parser.add_argument("--host", default=os.environ.get("BURP_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.environ.get("BURP_PORT", "1337")))
-    parser.add_argument("--key", default=os.environ.get("BURP_API_KEY", ""),
-                        help="Burp API Key (o BURP_API_KEY env var)")
+    parser.add_argument(
+        "--port", type=int, default=int(os.environ.get("BURP_PORT", "1337"))
+    )
+    parser.add_argument(
+        "--key",
+        default=os.environ.get("BURP_API_KEY", ""),
+        help="Burp API Key (o BURP_API_KEY env var)",
+    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
