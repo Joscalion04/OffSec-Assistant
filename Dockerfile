@@ -97,6 +97,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Incluye build tools para extensiones C/Rust de impacket y netexec
 RUN apt-get update && apt-get install -y --no-install-recommends \
         enum4linux \
+        enum4linux-ng \
         smbclient \
         ldap-utils \
         krb5-user \
@@ -117,7 +118,6 @@ RUN python3 -m venv /opt/venv \
         impacket \
         ldapdomaindump \
         bloodhound \
-        enum4linux-ng \
         requests \
         dnspython
 
