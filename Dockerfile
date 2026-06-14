@@ -98,6 +98,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         enum4linux \
         enum4linux-ng \
+        netexec \
         smbclient \
         ldap-utils \
         krb5-user \
@@ -120,9 +121,6 @@ RUN python3 -m venv /opt/venv \
         bloodhound \
         requests \
         dnspython
-
-# ── Capa 4d: netexec ─────────────────────────────────────────────────────
-RUN /opt/venv/bin/pip install --no-cache-dir --prefer-binary netexec
 
 ENV PATH="/opt/venv/bin:$PATH"
 
