@@ -129,7 +129,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN apt-get update && apt-get install -y --no-install-recommends \
         openvpn \
         wireguard-tools \
-        resolvconf \
         openresolv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
