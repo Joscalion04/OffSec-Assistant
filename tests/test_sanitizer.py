@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
-from sanitizer import DLPSanitizer, _is_exempt  # noqa: E402
+from sanitizer import DLPSanitizer, _is_exempt, IPV6_RE  # noqa: E402
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -328,11 +328,53 @@ def test_ip_not_in_cidr_notation_preserved(eng):
     assert "10.0.0.0" not in result
 
 
-def test_ipv6_not_tokenized(eng):
-    """IPv6 no está soportado aún (M1 issue: fix(dlp): add IPv6 tokenization)."""
-    ipv6 = "2001:db8::1"
-    result = eng.sanitize(f"Target IPv6: {ipv6}")
-    assert ipv6 in result, "IPv6 no debe tokenizarse hasta que se implemente (M1)"
+def test_ipv6_tokenized(eng):
+    result = eng.sanitize("Target IPv6: 2001:db8::1")
+    assert "2001:db8::1" not in result
+    assert "TGT-" in result
+
+
+def test_ipv6_full_form_tokenized(eng):
+    ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+    result = eng.sanitize(f"Host: {ipv6}")
+    assert ipv6 not in result
+    assert "TGT-" in result
+
+
+def test_ipv6_compressed_tokenized(eng):
+    result = eng.sanitize("Servidor: fe80::1")
+    # fe80:: es link-local — exento
+    assert "TGT-" not in result
+
+
+def test_ipv6_loopback_exempt(eng):
+    result = eng.sanitize("Loopback: ::1")
+    assert "::1" in result
+    assert "TGT-" not in result
+
+
+def test_ipv6_cidr_tokenized(eng):
+    result = eng.sanitize("Red: 2001:db8::/32")
+    assert "2001:db8::" not in result
+    assert "TGT-" in result
+
+
+def test_ipv6_same_address_same_token(eng):
+    t1 = eng.register_ip("2001:db8::1")
+    t2 = eng.register_ip("2001:db8::1")
+    assert t1 == t2
+
+
+def test_ipv6_regex_matches_full():
+    assert IPV6_RE.search("2001:0db8:85a3:0000:0000:8a2e:0370:7334") is not None
+
+
+def test_ipv6_regex_matches_compressed():
+    assert IPV6_RE.search("2001:db8::1") is not None
+
+
+def test_ipv6_regex_matches_loopback():
+    assert IPV6_RE.search("::1") is not None
 
 
 def test_corrupt_map_file_resets(eng_dir):
@@ -350,3 +392,52 @@ def test_email_before_host_no_double_replace(eng):
     result = eng.sanitize("admin@victima.com")
     # El email completo debe haberse reemplazado como MAIL token
     assert "@" not in result or "MAIL-" in result
+
+
+# ── validate_scope ────────────────────────────────────────────────────────────
+
+
+def test_validate_scope_missing_file(eng_dir):
+    s = DLPSanitizer(str(eng_dir))
+    errors = s.validate_scope()
+    assert any("no encontrado" in e for e in errors)
+
+
+def test_validate_scope_empty_file(eng_dir):
+    (eng_dir / "scope.md").write_text("   \n\n  ")
+    s = DLPSanitizer(str(eng_dir))
+    errors = s.validate_scope()
+    assert any("vacío" in e for e in errors)
+
+
+def test_validate_scope_comment_only(eng_dir):
+    (eng_dir / "scope.md").write_text("# Solo un comentario\n# Otro\n")
+    s = DLPSanitizer(str(eng_dir))
+    errors = s.validate_scope()
+    assert any("comentario" in e for e in errors)
+
+
+def test_validate_scope_valid_with_ipv4(eng_dir):
+    (eng_dir / "scope.md").write_text("# Scope\nTarget: 192.168.1.10\n")
+    s = DLPSanitizer(str(eng_dir))
+    assert s.validate_scope() == []
+
+
+def test_validate_scope_valid_with_ipv6(eng_dir):
+    (eng_dir / "scope.md").write_text("# Scope\nTarget: 2001:db8::1\n")
+    s = DLPSanitizer(str(eng_dir))
+    assert s.validate_scope() == []
+
+
+def test_validate_scope_valid_with_fqdn(eng_dir):
+    (eng_dir / "scope.md").write_text("# Scope\nDominio: target.example.com\n")
+    s = DLPSanitizer(str(eng_dir))
+    assert s.validate_scope() == []
+
+
+def test_validate_scope_unfilled_template(eng_dir):
+    content = "# Scope\n| [NOMBRE ENGAGEMENT] | desc |\n| [IP OBJETIVO] | host |\n| [REF XXXX] | ref |\n"
+    (eng_dir / "scope.md").write_text(content)
+    s = DLPSanitizer(str(eng_dir))
+    errors = s.validate_scope()
+    assert any("plantilla" in e for e in errors)

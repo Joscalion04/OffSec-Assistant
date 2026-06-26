@@ -19,6 +19,40 @@ DLP_SANITIZER="$OFFSEC_HOME/tools/sanitizer.py"
 
 mkdir -p "$LIVEFEED_DIR"
 
+# ── Gestión de PID hijo (para cleanup) ───────────────────────────────────────
+CHILD_PID=""
+
+# ── Cleanup ante SIGINT / SIGTERM ─────────────────────────────────────────────
+# Termina el proceso hijo activo (si existe), escribe marker al livefeed y sale.
+_cleanup() {
+    echo ""
+    echo "[$(date '+%H:%M:%S')] [INTERRUPT] Ejecucion interrumpida — limpiando..." \
+        | tee -a "${LIVEFEED_FILE:-/dev/null}"
+    if [ -n "$CHILD_PID" ] && kill -0 "$CHILD_PID" 2>/dev/null; then
+        kill -TERM "$CHILD_PID" 2>/dev/null
+        sleep 1
+        kill -KILL "$CHILD_PID" 2>/dev/null
+    fi
+    echo "[$(date '+%H:%M:%S')] [INTERRUPT] Scans huerfanos eliminados. Saliendo." \
+        >> "${LIVEFEED_FILE:-/dev/null}"
+    exit 130
+}
+trap _cleanup SIGINT SIGTERM
+
+# ── Validación de scope.md (gate obligatorio) ─────────────────────────────────
+# Ninguna herramienta activa puede ejecutarse sin un scope.md válido.
+if command -v python3 &>/dev/null && [ -f "$DLP_SANITIZER" ]; then
+    if [ -z "$ENGAGEMENT_DIR" ]; then
+        echo "[ERROR] Engagement '${ENGAGEMENT}' no encontrado en ${OFFSEC_HOME}/findings/" >&2
+        exit 1
+    fi
+    if ! SCOPE_ERRORS=$(python3 "$DLP_SANITIZER" "$ENGAGEMENT_DIR" --validate 2>&1); then
+        echo "[ERROR] scope.md inválido — abortando ejecución activa:" >&2
+        echo "$SCOPE_ERRORS" >&2
+        exit 1
+    fi
+fi
+
 # ── DLP: inicializar mapa desde scope.md al arrancar ─────────────────────────
 # El mapa se crea una sola vez por engagement; si ya existe, no hace nada nuevo
 if command -v python3 &>/dev/null && [ -f "$DLP_SANITIZER" ] && [ -n "$ENGAGEMENT_DIR" ]; then
@@ -85,14 +119,19 @@ run_cmd() {
     SAFE_CMD=$(sanitize_log "$CMD")
     log "START" "CMD: $SAFE_CMD"
 
-    # La ejecucion real usa los valores originales (el sanitizador no los altera)
+    # La ejecucion real usa los valores originales (el sanitizador no los altera).
+    # Se lanza en background y se espera para permitir que el trap SIGINT/SIGTERM
+    # pueda matar el proceso hijo si el operador interrumpe.
     if [ -n "$OUTFILE" ]; then
-        eval "$CMD" > "$OUTFILE" 2>&1
+        eval "$CMD" > "$OUTFILE" 2>&1 &
     else
-        eval "$CMD" 2>&1
+        eval "$CMD" 2>&1 &
     fi
-
+    CHILD_PID=$!
+    wait "$CHILD_PID"
     local EXIT=$?
+    CHILD_PID=""
+
     if [ $EXIT -eq 0 ]; then
         log "DONE" "$DESC completado"
     else
@@ -108,5 +147,6 @@ export LIVEFEED_FILE
 export ENGAGEMENT_DIR
 export DLP_SANITIZER
 export OFFSEC_HOME
+export CHILD_PID
 
 echo "$LIVEFEED_FILE"

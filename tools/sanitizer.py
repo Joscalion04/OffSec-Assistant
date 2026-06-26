@@ -73,6 +73,29 @@ IPV4_RE = re.compile(
     r"\b"
 )
 
+# ── Patrón IPv6 (RFC 5952 — full, compressed, CIDR) ──────────────────────────
+# Cubre las 9 formas canónicas: full 8-grupos, 7 variantes con ::, y :: solo.
+# Lookbehind/ahead evitan falsos positivos dentro de URLs o paths.
+_S = r"[0-9a-fA-F]{1,4}"
+IPV6_RE = re.compile(
+    r"(?<![:\.\w])"
+    r"(?:"
+    rf"(?:{_S}:){{7}}{_S}"  # 1:2:3:4:5:6:7:8
+    rf"|(?:{_S}:){{1,7}}:"  # 1:: … 7::
+    rf"|(?:{_S}:){{1,6}}:{_S}"  # 1::8 … 6::8
+    rf"|(?:{_S}:){{1,5}}(?::{_S}){{1,2}}"  # 1::7:8 … 5::7:8
+    rf"|(?:{_S}:){{1,4}}(?::{_S}){{1,3}}"
+    rf"|(?:{_S}:){{1,3}}(?::{_S}){{1,4}}"
+    rf"|(?:{_S}:){{1,2}}(?::{_S}){{1,5}}"
+    rf"|{_S}:(?::{_S}){{1,6}}"
+    rf"|:(?::{_S}){{1,7}}"  # ::1 … ::1:2:3:4:5:6:7
+    r"|::"  # :: (unspecified)
+    r")"
+    r"(?:/\d{1,3})?"  # prefijo CIDR opcional
+    r"(?![:\.\w])",
+    re.IGNORECASE,
+)
+
 # ── Patrón email ─────────────────────────────────────────────────────────────
 EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
 
@@ -83,13 +106,19 @@ EXEMPT_IPS = {
     "255.255.255.255",
 }
 
+# Prefijos IPv6 exentos (loopback, unspecified, multicast, link-local)
+_EXEMPT_IPV6_PREFIXES = ("::1", "::", "fe80:", "ff0", "fc00:", "fd")
 
-# Rangos de loopback extendidos (127.x.x.x)
+
 def _is_exempt(ip: str) -> bool:
     if ip in EXEMPT_IPS:
         return True
     if ip.startswith("127."):
         return True
+    ip_lower = ip.lower().split("/")[0]  # strip CIDR before checking
+    for prefix in _EXEMPT_IPV6_PREFIXES:
+        if ip_lower == prefix or ip_lower.startswith(prefix):
+            return True
     return False
 
 
@@ -182,7 +211,7 @@ class DLPSanitizer:
 
         text = EMAIL_RE.sub(_replace_email, text)
 
-        # 3. IPs conocidas y nuevas
+        # 3. IPs (IPv4 e IPv6)
         def _replace_ip(m):
             ip = m.group(0)
             if _is_exempt(ip):
@@ -190,6 +219,7 @@ class DLPSanitizer:
             return self._token("targets", ip, "TGT")
 
         text = IPV4_RE.sub(_replace_ip, text)
+        text = IPV6_RE.sub(_replace_ip, text)
 
         # 4. Hostnames conocidos (más largo primero, evita reemplazos parciales)
         sorted_hosts = sorted(
@@ -224,10 +254,14 @@ class DLPSanitizer:
 
         content = scope_file.read_text()
 
-        # Registrar IPs
+        # Registrar IPs (IPv4 e IPv6)
         for ip in set(IPV4_RE.findall(content)):
             if not _is_exempt(ip):
                 self.register_ip(ip)
+        for ip in set(IPV6_RE.findall(content)):
+            ip_str = ip if isinstance(ip, str) else ip[0]
+            if ip_str and not _is_exempt(ip_str):
+                self.register_ip(ip_str)
 
         # Registrar FQDNs / dominios (patron: word.word.tld)
         host_re = re.compile(r"\b(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,}\b")
@@ -256,6 +290,58 @@ class DLPSanitizer:
             f"[DLP] Mapa inicializado: {n_ips} IPs, {n_hosts} hosts, {n_orgs} orgs\n"
         )
 
+    # ── Validación de scope.md ────────────────────────────────────────────────
+
+    def validate_scope(self, scope_file: Optional[Union[str, Path]] = None) -> list:
+        """
+        Valida la estructura mínima de scope.md.
+        Retorna lista de errores (vacía = válido).
+        """
+        if scope_file is None:
+            scope_file = self.base / "scope.md"
+        scope_file = Path(scope_file)
+
+        if not scope_file.exists():
+            return [f"scope.md no encontrado en: {scope_file}"]
+
+        content = scope_file.read_text(errors="replace")
+
+        if not content.strip():
+            return ["scope.md está vacío — agregá al menos un target autorizado"]
+
+        # Líneas con contenido real (no vacías, no headers markdown)
+        meaningful = [
+            ln
+            for ln in content.splitlines()
+            if ln.strip() and not ln.strip().startswith("#")
+        ]
+        if not meaningful:
+            return ["scope.md solo contiene comentarios — no hay targets definidos"]
+
+        errors = []
+
+        # Detectar campos de plantilla sin completar: [TEXTO EN MAYÚSCULAS o descriptivo]
+        _placeholder_re = re.compile(r"\[[A-Z][A-Za-z _\-/]{4,}\]")
+        unfilled = [ln.strip() for ln in meaningful if _placeholder_re.search(ln)]
+        if unfilled:
+            errors.append(
+                f"scope.md contiene {len(unfilled)} campo(s) de plantilla sin completar "
+                f"(ej: {unfilled[0]!r})"
+            )
+
+        # Verificar que existe al menos un target (IP o FQDN)
+        _fqdn_re = re.compile(r"\b(?:[a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,}\b")
+        has_ipv4 = bool(IPV4_RE.search(content))
+        has_ipv6 = bool(IPV6_RE.search(content))
+        has_fqdn = bool(_fqdn_re.search(content))
+        if not (has_ipv4 or has_ipv6 or has_fqdn):
+            errors.append(
+                "scope.md no contiene IPs ni dominios — "
+                "definí al menos un target autorizado"
+            )
+
+        return errors
+
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
@@ -276,6 +362,15 @@ def main():
 
         if cmd == "--init":
             s.init_from_scope()
+            return
+
+        if cmd == "--validate":
+            errors = s.validate_scope()
+            if errors:
+                for err in errors:
+                    sys.stderr.write(f"[SCOPE] ERROR: {err}\n")
+                sys.exit(1)
+            sys.stderr.write("[SCOPE] OK — scope.md válido\n")
             return
 
         if cmd == "--register-host" and len(sys.argv) >= 4:
