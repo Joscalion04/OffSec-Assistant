@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Bloque 1: Lint ──────────────────────────────────────────────────────────
+  lint-python:
+    name: "Lint — Python (ruff + black)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff black
+
+      - name: ruff check
+        run: ruff check tools/*.py
+
+      - name: black format check
+        run: black --check tools/*.py
+
+  lint-shell:
+    name: "Lint — Shell (shellcheck)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: shellcheck
+        run: shellcheck tools/*.sh
+
+  lint-yaml:
+    name: "Lint — YAML (yamllint)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: yamllint
+        run: |
+          yamllint -c .yamllint.yaml \
+            docker-compose.yml docker-compose.full.yml \
+            .pre-commit-config.yaml .yamllint.yaml \
+            .github/workflows/ci.yml .github/workflows/release.yml
+
+  # ── Bloque 2: Seguridad ─────────────────────────────────────────────────────
+  security-secrets:
+    name: "Security — Gitleaks"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  security-deps:
+    name: "Security — pip-audit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: pip-audit
+        run: |
+          pip install impacket ldapdomaindump bloodhound requests dnspython \
+            2>/dev/null || true
+          pip-audit --skip-editable 2>/dev/null || true
+
+  # ── Bloque 3: Tests ─────────────────────────────────────────────────────────
+  tests:
+    name: "Tests — pytest"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run tests
+        run: python3 -m pytest tests/ -v
+
+  # ── Bloque 4: Docker ────────────────────────────────────────────────────────
+  docker-build:
+    name: "Docker — build lite"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build lite target
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: lite
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

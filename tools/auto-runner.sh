@@ -5,6 +5,7 @@
 ENGAGEMENT="$1"
 FASE="$2"
 TARGET="$3"
+export TARGET
 DATE=$(date +%Y-%m-%d)
 
 # Resolver ruta base: respeta OFFSEC_HOME si ya esta definida (Docker la inyecta),
