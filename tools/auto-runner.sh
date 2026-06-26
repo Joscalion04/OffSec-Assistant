@@ -12,7 +12,14 @@ DATE=$(date +%Y-%m-%d)
 # si no, deriva la ruta desde la ubicacion del propio script (funciona en host y CI)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OFFSEC_HOME="${OFFSEC_HOME:-$(dirname "$SCRIPT_DIR")}"
-ENGAGEMENT_DIR=$(find "$OFFSEC_HOME/findings" -maxdepth 1 -type d -name "*${ENGAGEMENT}*" | head -1)
+
+# ── Helpers compartidos ───────────────────────────────────────────────────────
+# shellcheck source=tools/lib.sh
+source "$SCRIPT_DIR/lib.sh"
+
+# ── Resolver engagement ───────────────────────────────────────────────────────
+ENGAGEMENT_DIR=$(require_engagement "$ENGAGEMENT" "$OFFSEC_HOME")
+
 LIVEFEED_DIR="$OFFSEC_HOME/logs/livefeed"
 LIVEFEED_FILE="$LIVEFEED_DIR/${DATE}_${ENGAGEMENT}_${FASE}.log"
 DLP_SANITIZER="$OFFSEC_HOME/tools/sanitizer.py"
@@ -35,21 +42,15 @@ _cleanup() {
     fi
     echo "[$(date '+%H:%M:%S')] [INTERRUPT] Scans huerfanos eliminados. Saliendo." \
         >> "${LIVEFEED_FILE:-/dev/null}"
-    exit 130
+    exit "$EXIT_INTERRUPTED"
 }
 trap _cleanup SIGINT SIGTERM
 
 # ── Validación de scope.md (gate obligatorio) ─────────────────────────────────
 # Ninguna herramienta activa puede ejecutarse sin un scope.md válido.
 if command -v python3 &>/dev/null && [ -f "$DLP_SANITIZER" ]; then
-    if [ -z "$ENGAGEMENT_DIR" ]; then
-        echo "[ERROR] Engagement '${ENGAGEMENT}' no encontrado en ${OFFSEC_HOME}/findings/" >&2
-        exit 1
-    fi
     if ! SCOPE_ERRORS=$(python3 "$DLP_SANITIZER" "$ENGAGEMENT_DIR" --validate 2>&1); then
-        echo "[ERROR] scope.md inválido — abortando ejecución activa:" >&2
-        echo "$SCOPE_ERRORS" >&2
-        exit 1
+        die "$EXIT_SCOPE" "scope.md inválido — abortando ejecución activa:\n${SCOPE_ERRORS}"
     fi
 fi
 

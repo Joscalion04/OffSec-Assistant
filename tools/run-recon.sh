@@ -1,14 +1,18 @@
 #!/bin/bash
 # OffSec Assistant — Reconocimiento autonomo
 # Uso: run-recon.sh <engagement> <target>
+# Env:  SCAN_PROFILE=silent|standard|aggressive (default: standard)
 
 ENGAGEMENT="$1"
 TARGET="$2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OFFSEC_HOME="${OFFSEC_HOME:-$(dirname "$SCRIPT_DIR")}"
 
-# Cargar motor de ejecucion (inicializa DLP, define log/run_cmd/sanitize_log)
+# Cargar motor de ejecucion (inicializa DLP, lib.sh, define log/run_cmd/sanitize_log)
 source "$OFFSEC_HOME/tools/auto-runner.sh" "$ENGAGEMENT" "recon" "$TARGET"
+
+# Cargar perfil de scan
+source "$OFFSEC_HOME/tools/scan-profiles.sh"
 
 RECON_DIR="$ENGAGEMENT_DIR/recon"
 mkdir -p "$RECON_DIR"
@@ -19,6 +23,7 @@ TARGET_TOKEN=$(sanitize_log "$TARGET")
 
 log "PHASE" "=========================================="
 log "PHASE" " RECON AUTONOMO — Target: $TARGET_TOKEN"
+log "PHASE" " Perfil: $SCAN_PROFILE"
 log "PHASE" "=========================================="
 
 # ----- PLAN -----
@@ -99,9 +104,14 @@ HAS_SSH=false
 HAS_SMB=false
 HAS_FTP=false
 
-if command -v nmap &>/dev/null; then
-    run_cmd "Nmap top-1000 puertos en $SCAN_TOKEN" \
-        "nmap -T4 --top-ports 1000 -oN $RECON_DIR/nmap_ports.txt $SCAN_TARGET" \
+if check_tool nmap; then
+    if $NMAP_FULL_PORTS; then
+        NMAP_PORT_ARGS="-p-"
+    else
+        NMAP_PORT_ARGS="--top-ports $NMAP_TOP_PORTS"
+    fi
+    run_cmd "Nmap ${NMAP_PORT_ARGS} en $SCAN_TOKEN [perfil: $SCAN_PROFILE]" \
+        "nmap $NMAP_TIMING $NMAP_PORT_ARGS $NMAP_EXTRA_FLAGS -oN $RECON_DIR/nmap_ports.txt $SCAN_TARGET" \
         "$RECON_DIR/nmap_ports.txt"
 
     OPEN_PORTS=$(grep "^[0-9]" "$RECON_DIR/nmap_ports.txt" 2>/dev/null \
@@ -131,6 +141,7 @@ if command -v nmap &>/dev/null; then
         log "THINK" "Considerar escaneo completo: nmap -p- $SCAN_TOKEN"
     fi
 else
+    warn "nmap no instalado — escaneo de puertos omitido"
     log "SKIP" "nmap no instalado — escaneo de puertos omitido"
 fi
 

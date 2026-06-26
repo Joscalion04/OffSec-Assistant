@@ -24,11 +24,31 @@ Leer los siguientes archivos SIEMPRE sanitizados:
      Sanitizar antes de leer:
        python3 "$OFFSEC_HOME/tools/sanitizer.py" "$ENGAGEMENT_DIR" <archivo>
 
--- Paso 3: Calcular CVSS 3.1 de cada hallazgo
+-- Paso 3: Validar y calcular CVSS 3.1 de cada hallazgo
 
-Para cada finding, extraer o calcular el vector CVSS 3.1:
-  - Si ya tiene score: usar el existente
-  - Si no tiene: calcular basado en descripción, impacto y vector de ataque
+Para cada finding, verificar los campos CVSS:
+
+  a) Campos que DEBEN existir y estar completos:
+     - CVSS Score: número entre 0.0 y 10.0
+     - CVSS Vector: string con formato CVSS:3.1/AV:.../...
+
+  b) Clasificar el estado de cada finding:
+     - COMPLETO:   tiene Score + Vector válidos
+     - ESTIMADO:   tiene Score pero no Vector (ej. exportados desde Burp)
+     - INCOMPLETO: falta Score o Vector
+     - SIN CVSS:   no tiene ningún dato CVSS
+
+  c) Para findings INCOMPLETOS o SIN CVSS:
+     - Intentar calcular el vector basándose en descripción e impacto declarado
+     - Si se puede calcular, marcarlo como [CALCULADO] en el reporte
+     - Si no hay suficiente información, marcarlo como [PENDIENTE-CVSS]
+
+  d) Si hay findings [PENDIENTE-CVSS]: mostrar advertencia al final del reporte:
+     "[ATENCION] N finding(s) sin CVSS completo — revisar antes de entregar al cliente"
+
+  e) Si el operador pasó --draft como argumento:
+     - Generar el reporte igual, marcando findings incompletos con [DRAFT]
+     - No bloquear la generación por CVSS faltante
 
 Clasificar por severidad:
   - Critical: CVSS 9.0 - 10.0

@@ -40,9 +40,10 @@ from pathlib import Path
 
 
 class BurpClient:
-    def __init__(self, host: str, port: int, api_key: str):
+    def __init__(self, host: str, port: int, api_key: str, timeout: int = 30):
         self.base_url = f"http://{host}:{port}/v0.1"
         self.api_key = api_key
+        self.timeout = timeout
         self.headers = {
             "Authorization": f"Token {api_key}",
             "Content-Type": "application/json",
@@ -57,7 +58,7 @@ class BurpClient:
             url, data=data, headers=self.headers, method=method
         )
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 raw = resp.read().decode()
                 return json.loads(raw) if raw.strip() else {}
         except urllib.error.HTTPError as e:
@@ -341,6 +342,12 @@ def main():
         default=os.environ.get("BURP_API_KEY", ""),
         help="Burp API Key (o BURP_API_KEY env var)",
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=int(os.environ.get("BURP_TIMEOUT", "30")),
+        help="Timeout HTTP en segundos (default: 30, env: BURP_TIMEOUT)",
+    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -364,7 +371,7 @@ def main():
         print("[ERROR] Se requiere BURP_API_KEY o --key", file=sys.stderr)
         sys.exit(1)
 
-    client = BurpClient(args.host, args.port, args.key)
+    client = BurpClient(args.host, args.port, args.key, timeout=args.timeout)
 
     if args.command == "status":
         cmd_status(client)

@@ -1,14 +1,18 @@
 #!/bin/bash
 # OffSec Assistant — Vulnerability scan autonomo
 # Uso: run-vuln-scan.sh <engagement> <target>
+# Env:  SCAN_PROFILE=silent|standard|aggressive (default: standard)
 
 ENGAGEMENT="$1"
 TARGET="$2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OFFSEC_HOME="${OFFSEC_HOME:-$(dirname "$SCRIPT_DIR")}"
 
-# Cargar motor de ejecucion (inicializa DLP, define log/run_cmd/sanitize_log)
+# Cargar motor de ejecucion (inicializa DLP, lib.sh, define log/run_cmd/sanitize_log)
 source "$OFFSEC_HOME/tools/auto-runner.sh" "$ENGAGEMENT" "vulnscan" "$TARGET"
+
+# Cargar perfil de scan
+source "$OFFSEC_HOME/tools/scan-profiles.sh"
 
 VULN_DIR="$ENGAGEMENT_DIR/vulns"
 RECON_DIR="$ENGAGEMENT_DIR/recon"
@@ -19,6 +23,7 @@ TARGET_TOKEN=$(sanitize_log "$TARGET")
 
 log "PHASE" "=========================================="
 log "PHASE" " VULN-SCAN AUTONOMO — Target: $TARGET_TOKEN"
+log "PHASE" " Perfil: $SCAN_PROFILE"
 log "PHASE" "=========================================="
 
 # Leer resultados de recon previo
@@ -104,9 +109,9 @@ if $HAS_WEB; then
     WEB_URL="${PROTO}://${TARGET}"
     WEB_URL_SAFE="${PROTO}://${TARGET_TOKEN}"
 
-    if command -v nikto &>/dev/null; then
-        run_cmd "Nikto web scan en $WEB_URL_SAFE" \
-            "nikto -h $WEB_URL -o $VULN_DIR/nikto.txt -Format txt" \
+    if check_tool nikto; then
+        run_cmd "Nikto web scan en $WEB_URL_SAFE [perfil: $SCAN_PROFILE]" \
+            "nikto -h $WEB_URL $NIKTO_OPTS -o $VULN_DIR/nikto.txt -Format txt" \
             "$VULN_DIR/nikto_live.txt"
 
         NIKTO_FINDINGS=$(grep -c "^\+" "$VULN_DIR/nikto.txt" 2>/dev/null || echo 0)
@@ -115,9 +120,9 @@ if $HAS_WEB; then
         log "SKIP" "nikto no instalado"
     fi
 
-    if command -v nuclei &>/dev/null; then
-        run_cmd "Nuclei critical/high en $WEB_URL_SAFE" \
-            "nuclei -u $WEB_URL -severity critical,high -o $VULN_DIR/nuclei.txt -silent" \
+    if check_tool nuclei; then
+        run_cmd "Nuclei ${NUCLEI_SEVERITY} en $WEB_URL_SAFE [perfil: $SCAN_PROFILE]" \
+            "nuclei -u $WEB_URL -severity $NUCLEI_SEVERITY -o $VULN_DIR/nuclei.txt -silent" \
             "$VULN_DIR/nuclei_live.txt"
 
         NUCLEI_COUNT=$(wc -l < "$VULN_DIR/nuclei.txt" 2>/dev/null || echo 0)

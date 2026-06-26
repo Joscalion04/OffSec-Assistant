@@ -2,15 +2,65 @@ Genera el briefing de inicio de día para todos los engagements activos.
 
 Determina OFFSEC_HOME="${OFFSEC_HOME:-$(pwd)}" antes de comenzar.
 
--- Paso 1: Descubrir engagements activos
+-- Paso 1: Verificar estado del entorno y descubrir engagements activos
 
-Ejecuta:
-  ls -dt $OFFSEC_HOME/findings/????-??-??_* 2>/dev/null
+Ejecuta en orden:
 
-Un engagement se considera activo si tiene scope.md y context.md.
-Si no hay engagements, responde:
-  "No hay engagements activos. Para iniciar uno: /new-engagement <nombre>"
-y detente.
+  a) Verificar que el directorio base existe:
+     ls "$OFFSEC_HOME/findings" 2>/dev/null
+
+     Si findings/ no existe, mostrar:
+     ---
+     ## OffSec Brief — [fecha]
+     ### Estado: Instalación limpia detectada
+
+     No existe el directorio `findings/`. El entorno aún no tiene engagements.
+
+     **Para comenzar:**
+     1. Crear un nuevo engagement: `/new-engagement <nombre>`
+     2. Editar `findings/<fecha>_<nombre>/scope.md` con los targets autorizados
+     3. Iniciar reconocimiento: `/recon <target>`
+
+     Herramientas disponibles: `/check-tools`
+     ---
+     y detente.
+
+  b) Listar todos los directorios de engagement:
+     ls -dt $OFFSEC_HOME/findings/????-??-??_* 2>/dev/null
+
+     Si el directorio está vacío (ningún resultado), mostrar:
+     ---
+     ## OffSec Brief — [fecha]
+     ### Estado: Sin engagements
+
+     El directorio `findings/` existe pero no contiene engagements.
+
+     **Para comenzar:**
+     1. Crear un nuevo engagement: `/new-engagement <nombre>`
+     2. Editar el `scope.md` generado con los targets autorizados
+     3. Iniciar reconocimiento: `/recon <target>`
+     ---
+     y detente.
+
+  c) Filtrar engagements activos — un engagement es activo si tiene AMBOS:
+     - scope.md
+     - context.md
+
+     Si ningún engagement tiene ambos archivos, mostrar:
+     ---
+     ## OffSec Brief — [fecha]
+     ### Estado: Engagements incompletos
+
+     Se encontraron [N] directorio(s) pero ninguno tiene scope.md + context.md completos.
+
+     Directorios encontrados:
+     - [lista de dirs con qué archivo les falta]
+
+     **Acciones sugeridas:**
+     - Si acabas de crear un engagement: editá `scope.md` y ejecutá `/recon <target>`
+     - Si el context.md no existe todavía: el primer `/recon` lo genera automáticamente
+     ---
+     y detente.
 
 -- Paso 2: Para cada engagement activo, recopilar estado
 
