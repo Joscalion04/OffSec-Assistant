@@ -6,6 +6,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0](https://github.com/Joscalion04/OffSec-Assistant/compare/v1.0.0...v1.1.0) (2026-06-26)
+
+
+### Features
+
+* **config:** implement scan profile system ([cca2dd4](https://github.com/Joscalion04/OffSec-Assistant/commit/cca2dd432a7cada32801e474050b1dfc1b9aaf30))
+* **m1-p1:** DLP IPv6, scope validation gate, SIGINT/SIGTERM cleanup ([5fe7b8a](https://github.com/Joscalion04/OffSec-Assistant/commit/5fe7b8a804e3c3ac31994256d38750ea357b3dca))
+* **m1-p2:** lib.sh, scan profiles, Burp timeout, morning-brief, CVSS validation ([cca2dd4](https://github.com/Joscalion04/OffSec-Assistant/commit/cca2dd432a7cada32801e474050b1dfc1b9aaf30))
+
+
+### Bug Fixes
+
+* **commands:** improve morning-brief empty-state handling ([cca2dd4](https://github.com/Joscalion04/OffSec-Assistant/commit/cca2dd432a7cada32801e474050b1dfc1b9aaf30))
+* **dlp:** add IPv6 tokenization support (RFC 5952) ([5fe7b8a](https://github.com/Joscalion04/OffSec-Assistant/commit/5fe7b8a804e3c3ac31994256d38750ea357b3dca))
+* **integrations:** expose configurable Burp timeout ([cca2dd4](https://github.com/Joscalion04/OffSec-Assistant/commit/cca2dd432a7cada32801e474050b1dfc1b9aaf30))
+* **reporting:** validate incomplete CVSS data in report command ([cca2dd4](https://github.com/Joscalion04/OffSec-Assistant/commit/cca2dd432a7cada32801e474050b1dfc1b9aaf30))
+* **runtime:** implement graceful SIGINT/SIGTERM cleanup ([5fe7b8a](https://github.com/Joscalion04/OffSec-Assistant/commit/5fe7b8a804e3c3ac31994256d38750ea357b3dca))
+* **scope:** validate minimum scope.md structure ([5fe7b8a](https://github.com/Joscalion04/OffSec-Assistant/commit/5fe7b8a804e3c3ac31994256d38750ea357b3dca))
+
 ## 1.0.0 (2026-06-26)
 
 
