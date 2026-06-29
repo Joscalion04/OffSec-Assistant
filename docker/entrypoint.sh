@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # OffSec Assistant — Entrypoint del contenedor
-# Gestiona el ciclo de vida: VPN opcional → validación → Claude Code
+# Gestiona el ciclo de vida: VPN opcional → validación → proceso principal
+#
+# En modo daemon (docker compose up -d), el proceso principal es "tail -f /dev/null".
+# Las sesiones de Claude Code se abren vía: docker exec -it offsec-assistant claude
 
 set -euo pipefail
 
@@ -85,14 +88,14 @@ if [ "${USE_VPN:-false}" = "true" ]; then
 
     elif ls /vpn/*.ovpn &>/dev/null 2>&1; then
         # Tomar el primer .ovpn disponible
-        first_ovpn=$(ls /vpn/*.ovpn | head -n1)
+        first_ovpn=$(find /vpn -name "*.ovpn" -print | head -n1)
         setup_openvpn "$first_ovpn"
 
     elif [ -f "/vpn/wg0.conf" ]; then
         setup_wireguard "/vpn/wg0.conf"
 
     elif ls /vpn/*.conf &>/dev/null 2>&1; then
-        first_conf=$(ls /vpn/*.conf | head -n1)
+        first_conf=$(find /vpn -name "*.conf" -print | head -n1)
         setup_wireguard "$first_conf"
 
     else
@@ -119,6 +122,27 @@ log_ok "Workspace: /workspace"
 # Mostrar IP de VPN si está activa
 if [ "${USE_VPN:-false}" = "true" ]; then
     log_info "Ruta de salida: $(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -1 || echo 'N/A')"
+fi
+
+# ── Modo daemon ───────────────────────────────────────────────────────────────
+# Cuando el comando principal es un proceso persistente (tail -f /dev/null),
+# registramos un handler de SIGTERM para apagado limpio.
+if [ "${1:-}" = "tail" ]; then
+    log_info "Modo daemon activo — conectate con: offsec in"
+
+    # shellcheck disable=SC2317  # función invocada vía trap, no directamente
+    _shutdown() {
+        log_info "Señal de apagado recibida — cerrando..."
+        kill 0 2>/dev/null || true
+        exit 0
+    }
+    trap '_shutdown' SIGTERM SIGINT
+
+    # exec reemplaza este proceso — el trap no sobreviviría.
+    # Lanzamos tail en background y esperamos para que el trap funcione.
+    tail -f /dev/null &
+    wait $!
+    exit 0
 fi
 
 # ── Lanzar comando ────────────────────────────────────────────────────────────
