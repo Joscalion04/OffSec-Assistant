@@ -224,7 +224,7 @@ v2.0.0
 
 | Milestone | Version | Focus | Status |
 |------------|----------|--------|---------|
-| M1 | v1.1.0 | Core Stability & Hardening | Planned |
+| M1 | v1.1.0 | Core Stability & Hardening | In Review |
 | M2 | v1.2.0 | DLP v2: Encryption & Vault | Planned |
 | M3 | v1.3.0 | Execution Optimization | Planned |
 | M4 | v1.4.0 | Governance & Forensic Auditing | Planned |
@@ -265,7 +265,7 @@ and execution consistency.
 Core
 Bug
 P1
-Status: Backlog
+Status: Done
 ```
 
 The current scope gate only validates file existence.
@@ -275,10 +275,10 @@ is declared before any active operation can execute.
 
 **Acceptance Criteria**
 
-- Detect empty scope files
-- Detect comment-only files
-- Provide descriptive error messages
-- Update scope template documentation
+- [x] Detect empty scope files
+- [x] Detect comment-only files
+- [x] Provide descriptive error messages
+- [x] Update scope template documentation
 
 ---
 
@@ -290,18 +290,18 @@ is declared before any active operation can execute.
 Core
 Bug
 P1
-Status: Backlog
+Status: Done
 ```
 
 Autonomous executions must terminate safely.
 
 **Acceptance Criteria**
 
-- Handle SIGINT
-- Handle SIGTERM
-- Terminate child processes
-- Write interruption markers to logs
-- Prevent orphaned scans
+- [x] Handle SIGINT
+- [x] Handle SIGTERM
+- [x] Terminate child processes
+- [x] Write interruption markers to logs
+- [x] Prevent orphaned scans
 
 ---
 
@@ -313,18 +313,18 @@ Autonomous executions must terminate safely.
 DLP
 Bug
 P1
-Status: Backlog
+Status: Done
 ```
 
 Current DLP only recognizes IPv4 addresses.
 
 **Acceptance Criteria**
 
-- IPv6 support
-- Compressed IPv6 support
-- IPv6 CIDR support
-- Test coverage
-- Documentation updates
+- [x] IPv6 support
+- [x] Compressed IPv6 support
+- [x] IPv6 CIDR support
+- [x] Test coverage
+- [x] Documentation updates
 
 ---
 
@@ -336,16 +336,16 @@ Current DLP only recognizes IPv4 addresses.
 Commands
 Bug
 P2
-Status: Backlog
+Status: Done
 ```
 
 Handle clean installations gracefully.
 
 **Acceptance Criteria**
 
-- Detect missing findings directory
-- Detect empty engagements
-- Display onboarding guidance
+- [x] Detect missing findings directory
+- [x] Detect empty engagements
+- [x] Display onboarding guidance
 
 ---
 
@@ -357,14 +357,14 @@ Handle clean installations gracefully.
 Reporting
 Bug
 P2
-Status: Backlog
+Status: Done
 ```
 
 **Acceptance Criteria**
 
-- Detect incomplete CVSS fields
-- Display warnings
-- Draft mode support
+- [x] Detect incomplete CVSS fields
+- [x] Display warnings
+- [x] Draft mode support
 
 ---
 
@@ -376,13 +376,13 @@ Status: Backlog
 Commands
 Bug
 P3
-Status: Backlog
+Status: Done
 ```
 
 **Acceptance Criteria**
 
-- CLI timeout option
-- Environment variable support
+- [x] CLI timeout option
+- [x] Environment variable support
 
 ---
 
@@ -394,14 +394,14 @@ Status: Backlog
 Core
 Refactor
 P2
-Status: Backlog
+Status: Done
 ```
 
 **Acceptance Criteria**
 
-- Shared lib.sh
-- Standardized exit codes
-- Common validation helpers
+- [x] Shared lib.sh
+- [x] Standardized exit codes
+- [x] Common validation helpers
 
 ---
 
@@ -413,16 +413,40 @@ Status: Backlog
 Commands
 Feature
 P2
-Status: Backlog
+Status: Done
 ```
 
 **Acceptance Criteria**
 
-- Silent profile
-- Standard profile
-- Aggressive profile
-- YAML configuration
-- Documentation
+- [x] Silent profile
+- [x] Standard profile
+- [x] Aggressive profile
+- [x] YAML configuration
+- [x] Documentation
+
+---
+
+#### feat(cli): implement host-side offsec CLI and install.sh
+
+**Labels**
+
+```text
+Core
+Docker
+Feature
+P2
+Status: Done
+```
+
+Added as unplanned work during M1 execution.
+
+**Acceptance Criteria**
+
+- [x] offsec CLI v1.1.0 con comandos: start, down, restart, in, status, logs, build
+- [x] install.sh bootstrap con detección de deps, PATH y .env
+- [x] Docker daemon mode (tail -f /dev/null) — exit no mata el contenedor
+- [x] SIGTERM handler en entrypoint para apagado limpio
+- [x] restart: unless-stopped en docker-compose
 
 ---
 
