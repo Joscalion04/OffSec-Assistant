@@ -6,6 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.2.0](https://github.com/Joscalion04/OffSec-Assistant/compare/v1.1.0...v1.2.0) (2026-06-29)
+
+
+### Features
+
+* **m1-p3:** host CLI offsec, install.sh y modo daemon Docker ([820cde3](https://github.com/Joscalion04/OffSec-Assistant/commit/820cde3850ed9f464b33a1152fb1dc063f1fa1e4))
+* **M1:** Core Stability & Hardening — v1.1.0 ([2b0f256](https://github.com/Joscalion04/OffSec-Assistant/commit/2b0f256dd0ea5ea6bd790d307cde1f44f1de0e80))
+
 ## [1.1.0](https://github.com/Joscalion04/OffSec-Assistant/compare/v1.0.0...v1.1.0) (2026-06-26)
 
 
