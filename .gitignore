@@ -17,5 +17,6 @@ findings/
 *.pem
 *.p12
 docker/vpn/*.conf
-.claude/settings.local.json
 
+# CLI — config del usuario (contiene OFFSEC_HOME local)
+.claude/settings.local.json
