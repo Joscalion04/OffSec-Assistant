@@ -7,9 +7,10 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.5.0"
 CONTAINER_NAME="offsec-assistant"
-CONFIG_FILE="${HOME}/.config/offsec/env"
+CONFIG_ENV="${HOME}/.config/offsec/env"
+CONFIG_USER="${HOME}/.config/offsec/config"
 
 # ── Colores ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
@@ -23,14 +24,13 @@ die()   { error "$*"; exit 1; }
 
 # ── Resolver OFFSEC_HOME ───────────────────────────────────────────────────────
 _load_config() {
-    # Prioridad: variable de entorno > archivo de config
-    if [[ -z "${OFFSEC_HOME:-}" ]] && [[ -f "$CONFIG_FILE" ]]; then
+    if [[ -z "${OFFSEC_HOME:-}" ]] && [[ -f "$CONFIG_ENV" ]]; then
         # shellcheck source=/dev/null
-        source "$CONFIG_FILE"
+        source "$CONFIG_ENV"
     fi
 
     if [[ -z "${OFFSEC_HOME:-}" ]]; then
-        die "OFFSEC_HOME no configurado. Ejecutá: offsec install\n       o: export OFFSEC_HOME=/ruta/al/proyecto"
+        die "OFFSEC_HOME no configurado. Ejecutá: ./install.sh\n       o: export OFFSEC_HOME=/ruta/al/proyecto"
     fi
 
     if [[ ! -f "${OFFSEC_HOME}/docker-compose.yml" ]]; then
@@ -38,6 +38,22 @@ _load_config() {
     fi
 
     COMPOSE="docker compose -f ${OFFSEC_HOME}/docker-compose.yml"
+
+    # Cargar configuración de usuario si existe
+    # shellcheck source=/dev/null
+    [[ -f "$CONFIG_USER" ]] && source "$CONFIG_USER"
+}
+
+# Construye flags -e para docker exec a partir de CONFIG_USER
+_exec_env_flags() {
+    local -a flags=()
+    if [[ -f "$CONFIG_USER" ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# || -z "${key// /}" ]] && continue
+            flags+=("-e" "${key}=${value}")
+        done < "$CONFIG_USER"
+    fi
+    printf '%s\0' "${flags[@]}"
 }
 
 # ── Validar Docker ─────────────────────────────────────────────────────────────
@@ -63,8 +79,18 @@ _require_running() {
     fi
 }
 
+# ── Buscar engagement por nombre parcial ───────────────────────────────────────
+_find_engagement_dir() {
+    local name="${1:-}"
+    [[ -z "$name" ]] && die "Nombre de engagement requerido."
+    local found
+    found=$(find "${OFFSEC_HOME}/findings" -mindepth 1 -maxdepth 1 -type d -name "*${name}*" | head -1)
+    [[ -z "$found" ]] && die "No se encontró engagement que coincida con '${name}'"
+    echo "$found"
+}
+
 # ══════════════════════════════════════════════════════════════════════════════
-# COMANDOS
+# COMANDOS — Ciclo de vida del contenedor
 # ══════════════════════════════════════════════════════════════════════════════
 
 cmd_start() {
@@ -75,12 +101,12 @@ cmd_start() {
         [[ "$arg" == "--vpn" ]] && use_vpn="true"
     done
 
-    # Verificar .env
     if [[ ! -f "${OFFSEC_HOME}/.env" ]]; then
         warn "Archivo .env no encontrado en ${OFFSEC_HOME}"
         if [[ -f "${OFFSEC_HOME}/.env.example" ]]; then
             info  "Crealo con: cp ${OFFSEC_HOME}/.env.example ${OFFSEC_HOME}/.env"
-            info  "Luego editá ANTHROPIC_API_KEY y volvé a ejecutar offsec start"
+            info  "El contenedor usará tu sesión Claude Pro del host (~/.claude)"
+            info  "Si aún no iniciaste sesión: claude login"
         fi
         exit 1
     fi
@@ -96,7 +122,6 @@ cmd_start() {
 
     USE_VPN="$use_vpn" $COMPOSE up -d
 
-    # Esperar hasta que esté activo (máx 20 segundos)
     local tries=0
     while [[ $tries -lt 20 ]]; do
         if _is_running; then
@@ -137,11 +162,18 @@ cmd_in() {
     _check_docker; _load_config
     _require_running
 
+    # Construir flags de entorno desde configuración de usuario
+    local -a env_flags=()
+    if [[ -f "$CONFIG_USER" ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# || -z "${key// /}" ]] && continue
+            env_flags+=("-e" "${key}=${value}")
+        done < "$CONFIG_USER"
+    fi
+
     info "Conectando al assistant..."
     echo ""
-    # Abre una sesión de Claude Code dentro del contenedor en ejecución.
-    # "exit" o Ctrl+D cierra solo el exec — el contenedor sigue vivo.
-    docker exec -it "$CONTAINER_NAME" claude
+    docker exec -it "${env_flags[@]}" "$CONTAINER_NAME" claude
 }
 
 cmd_status() {
@@ -152,9 +184,8 @@ cmd_status() {
     echo "  ───────────────────────────────────────"
 
     if _is_running; then
-        local started
+        local started health
         started=$(docker inspect -f '{{.State.StartedAt}}' "$CONTAINER_NAME" 2>/dev/null | cut -dT -f1)
-        local health
         health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}}' "$CONTAINER_NAME" 2>/dev/null)
 
         echo -e "  Contenedor:   ${GREEN}running${RESET}"
@@ -177,8 +208,7 @@ cmd_status() {
             echo -e "  · ${BOLD}${name}${RESET}  (última actividad: ${last})"
             count=$((count + 1))
         done < <(find "$findings_dir" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | sort -rz)
-
-        [[ $count -eq 0 ]] && echo "  (ninguno — usá 'offsec in' y luego /new-engagement <nombre>)"
+        [[ $count -eq 0 ]] && echo "  (ninguno — usá: offsec new <nombre>)"
     else
         echo "  findings/ no encontrado en ${OFFSEC_HOME}"
     fi
@@ -201,7 +231,240 @@ cmd_build() {
     ok "Build completo."
 }
 
-# ── Help ───────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# COMANDOS — Engagement shortcuts (#47)
+# ══════════════════════════════════════════════════════════════════════════════
+
+cmd_list() {
+    _load_config
+    local findings_dir="${OFFSEC_HOME}/findings"
+
+    echo ""
+    echo -e "${BOLD}  Engagements${RESET}"
+    echo "  ──────────────────────────────────────────────────────────────"
+
+    if [[ ! -d "$findings_dir" ]]; then
+        echo "  (sin engagements — usá: offsec new <nombre>)"
+        echo ""
+        return 0
+    fi
+
+    local count=0
+    while IFS= read -r -d '' dir; do
+        local name last_date findings_count
+        name=$(basename "$dir")
+        last_date=$(stat -c "%y" "${dir}/context.md" 2>/dev/null | cut -d' ' -f1 || echo "—")
+        findings_count=$(find "$dir" -name "finding_*.md" 2>/dev/null | wc -l)
+        printf "  · ${BOLD}%-40s${RESET}  findings: %2d  actividad: %s\n" \
+            "$name" "$findings_count" "$last_date"
+        count=$((count + 1))
+    done < <(find "$findings_dir" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | sort -rz)
+
+    [[ $count -eq 0 ]] && echo "  (sin engagements — usá: offsec new <nombre>)"
+    echo ""
+}
+
+cmd_new() {
+    _check_docker; _load_config
+    _require_running
+
+    local name="${1:-}"
+    [[ -z "$name" ]] && die "Uso: offsec new <nombre-engagement>"
+
+    info "Iniciando nuevo engagement: ${name}"
+    echo ""
+    docker exec -it "$CONTAINER_NAME" claude "/new-engagement ${name}"
+}
+
+cmd_brief() {
+    _check_docker; _load_config
+    _require_running
+
+    info "Iniciando morning brief..."
+    echo ""
+    docker exec -it "$CONTAINER_NAME" claude "/morning-brief"
+}
+
+cmd_report() {
+    _check_docker; _load_config
+    _require_running
+
+    local engagement="${1:-}"
+    [[ -z "$engagement" ]] && die "Uso: offsec report <nombre-engagement>"
+
+    info "Generando reporte para: ${engagement}"
+    echo ""
+    docker exec -it "$CONTAINER_NAME" claude "/report ${engagement}"
+}
+
+cmd_scope() {
+    _load_config
+
+    local engagement="${1:-}"
+    [[ -z "$engagement" ]] && die "Uso: offsec scope <nombre-engagement>"
+
+    local eng_dir
+    eng_dir=$(_find_engagement_dir "$engagement")
+    local scope_file="${eng_dir}/scope.md"
+
+    if [[ ! -f "$scope_file" ]]; then
+        die "No se encontró scope.md en ${eng_dir}"
+    fi
+
+    local editor="${EDITOR:-${VISUAL:-vim}}"
+    info "Abriendo scope.md de $(basename "$eng_dir") con ${editor}..."
+    "$editor" "$scope_file"
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMANDOS — Update (#48)
+# ══════════════════════════════════════════════════════════════════════════════
+
+cmd_update() {
+    _load_config
+
+    local check_only="false"
+    [[ "${1:-}" == "--check" ]] && check_only="true"
+
+    info "Verificando actualizaciones en origin/main..."
+
+    local current_commit
+    current_commit=$(git -C "$OFFSEC_HOME" rev-parse HEAD 2>/dev/null) || \
+        die "OFFSEC_HOME no es un repositorio git."
+
+    git -C "$OFFSEC_HOME" fetch origin main --quiet 2>/dev/null || {
+        warn "No se pudo conectar al repositorio remoto. Verificá tu conexión."
+        return 1
+    }
+
+    local remote_commit
+    remote_commit=$(git -C "$OFFSEC_HOME" rev-parse origin/main)
+
+    if [[ "$current_commit" == "$remote_commit" ]]; then
+        ok "Ya estás en la última versión ($(git -C "$OFFSEC_HOME" describe --tags --always 2>/dev/null || echo "${current_commit:0:7}"))."
+        return 0
+    fi
+
+    echo ""
+    info "Actualizaciones disponibles:"
+    git -C "$OFFSEC_HOME" log --oneline "${current_commit}..origin/main"
+    echo ""
+
+    if [[ "$check_only" == "true" ]]; then
+        info "Ejecutá 'offsec update' para aplicar."
+        return 0
+    fi
+
+    # Detectar si el Dockerfile cambió para decidir rebuild
+    local dockerfile_changed="false"
+    if git -C "$OFFSEC_HOME" diff --name-only "${current_commit}..origin/main" | grep -q "^Dockerfile"; then
+        dockerfile_changed="true"
+        warn "El Dockerfile cambió — se reconstruirá la imagen."
+    fi
+
+    info "Aplicando actualización..."
+    git -C "$OFFSEC_HOME" pull origin main --quiet
+    ok "Código actualizado."
+
+    # Mostrar novedades del CHANGELOG
+    local changelog_diff
+    changelog_diff=$(git -C "$OFFSEC_HOME" diff "${current_commit}..HEAD" -- CHANGELOG.md \
+        | grep "^+" | grep -v "^+++" | head -30 | sed 's/^+//')
+    if [[ -n "$changelog_diff" ]]; then
+        echo ""
+        echo -e "${BOLD}  Novedades:${RESET}"
+        while IFS= read -r line; do echo "  ${line}"; done <<< "$changelog_diff"
+        echo ""
+    fi
+
+    if [[ "$dockerfile_changed" == "true" ]]; then
+        info "Reconstruyendo imagen Docker..."
+        $COMPOSE build --quiet
+        ok "Imagen reconstruida."
+    fi
+
+    if _is_running; then
+        info "Reiniciando contenedor con la nueva versión..."
+        $COMPOSE up -d
+        ok "Contenedor actualizado."
+    else
+        info "Contenedor detenido — inicialo con: offsec start"
+    fi
+
+    ok "Actualización completa."
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COMANDOS — Config (#49)
+# ══════════════════════════════════════════════════════════════════════════════
+
+cmd_config() {
+    local subcommand="${1:-list}"
+    shift 2>/dev/null || true
+
+    mkdir -p "$(dirname "$CONFIG_USER")"
+    [[ ! -f "$CONFIG_USER" ]] && touch "$CONFIG_USER"
+
+    case "$subcommand" in
+        set)
+            local key="${1:-}" value="${2:-}"
+            [[ -z "$key" || -z "$value" ]] && die "Uso: offsec config set <CLAVE> <VALOR>"
+            # Reemplazar si existe, agregar si no
+            if grep -q "^${key}=" "$CONFIG_USER" 2>/dev/null; then
+                sed -i "s|^${key}=.*|${key}=${value}|" "$CONFIG_USER"
+            else
+                echo "${key}=${value}" >> "$CONFIG_USER"
+            fi
+            ok "${key}=${value}"
+            ;;
+        get)
+            local key="${1:-}"
+            [[ -z "$key" ]] && die "Uso: offsec config get <CLAVE>"
+            local val
+            val=$(grep "^${key}=" "$CONFIG_USER" 2>/dev/null | cut -d'=' -f2- || true)
+            [[ -z "$val" ]] && die "Clave '${key}' no configurada. Usá: offsec config set ${key} <valor>"
+            echo "${key}=${val}"
+            ;;
+        list)
+            echo ""
+            echo -e "${BOLD}  Configuración activa${RESET}  (${CONFIG_USER})"
+            echo "  ──────────────────────────────────────────────────"
+            if [[ ! -s "$CONFIG_USER" ]]; then
+                echo "  (sin configuración)"
+            else
+                while IFS='=' read -r key value; do
+                    [[ "$key" =~ ^[[:space:]]*# || -z "${key// /}" ]] && continue
+                    printf "  %-20s = %s\n" "$key" "$value"
+                done < "$CONFIG_USER"
+            fi
+            echo ""
+            echo -e "${BOLD}  Claves disponibles:${RESET}"
+            echo "  EDITOR         — editor de texto para scope/findings (default: vim)"
+            echo "  REPORT_LANG    — idioma de reportes (default: es)"
+            echo "  BURP_TIMEOUT   — timeout de Burp API en segundos (default: 120)"
+            echo "  SCAN_PROFILE   — perfil de escaneo: silent|standard|aggressive (default: standard)"
+            echo ""
+            ;;
+        reset)
+            echo -n "  Confirmar reset de configuración [s/N]: "
+            read -r confirm
+            if [[ "$confirm" =~ ^[sS]$ ]]; then
+                true > "$CONFIG_USER"
+                ok "Configuración reseteada."
+            else
+                info "Cancelado."
+            fi
+            ;;
+        *)
+            die "Subcomando desconocido: '${subcommand}'. Uso: offsec config {set|get|list|reset}"
+            ;;
+    esac
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELP (#50)
+# ══════════════════════════════════════════════════════════════════════════════
+
 _show_help() {
     echo ""
     echo -e "${BOLD}  OffSec Assistant CLI  v${VERSION}${RESET}"
@@ -209,28 +472,44 @@ _show_help() {
     echo -e "${BOLD}  Uso:${RESET}  offsec <comando> [opciones]"
     echo ""
     echo -e "${BOLD}  Contenedor:${RESET}"
-    echo "    start [--vpn]     Inicia el contenedor en background"
-    echo "    down              Detiene el contenedor"
-    echo "    restart           Reinicia el contenedor"
-    echo "    in                Abre una sesión Claude Code (exit no mata el contenedor)"
-    echo "    status            Estado del contenedor y engagements activos"
-    echo "    logs [-f]         Logs del contenedor (acepta flags de docker compose logs)"
-    echo "    build [lite|full] Reconstruye la imagen Docker"
+    echo "    start [--vpn]       Inicia el contenedor en background"
+    echo "    down                Detiene el contenedor"
+    echo "    restart             Reinicia el contenedor"
+    echo "    in                  Abre una sesión Claude Code (exit no mata el contenedor)"
+    echo "    status              Estado del contenedor y engagements activos"
+    echo "    logs [-f]           Logs del contenedor"
+    echo "    build [lite|full]   Reconstruye la imagen Docker"
+    echo ""
+    echo -e "${BOLD}  Engagements:${RESET}"
+    echo "    list                Lista todos los engagements con findings y última actividad"
+    echo "    new <nombre>        Inicia un nuevo engagement dentro del assistant"
+    echo "    brief               Ejecuta el morning brief dentro del assistant"
+    echo "    report <nombre>     Genera el reporte final del engagement"
+    echo "    scope <nombre>      Abre el scope.md del engagement en \$EDITOR"
+    echo ""
+    echo -e "${BOLD}  Mantenimiento:${RESET}"
+    echo "    update [--check]    Actualiza el assistant a la última versión"
+    echo "    config <sub>        Gestiona configuración: set|get|list|reset"
     echo ""
     echo -e "${BOLD}  Sistema:${RESET}"
-    echo "    version           Muestra la versión del CLI"
-    echo "    help              Muestra esta ayuda"
+    echo "    version             Muestra la versión del CLI"
+    echo "    help                Muestra esta ayuda"
     echo ""
     echo -e "${BOLD}  Flujo típico:${RESET}"
     echo ""
-    echo "    offsec start          # Levantá el contenedor"
-    echo "    offsec in             # Conectate — Claude Code queda listo"
-    echo "    # Dentro del assistant:"
-    echo "    # /new-engagement cliente-2024"
-    echo "    # /recon TGT-001"
-    echo "    # exit                ← cierra la sesión, contenedor sigue vivo"
-    echo "    offsec status         # Revisá engagements activos"
-    echo "    offsec down           # Cuando terminaste por hoy"
+    echo "    offsec start            # Levantá el contenedor"
+    echo "    offsec new cliente-24   # Inicializá el engagement"
+    echo "    offsec brief            # Revisá el estado al inicio del día"
+    echo "    offsec in               # Sesión libre — claude queda listo"
+    echo "    offsec list             # Revisá engagements desde el host"
+    echo "    offsec report cliente-24 # Generá el reporte final"
+    echo "    offsec down             # Cuando terminaste por hoy"
+    echo ""
+    echo -e "${BOLD}  Configuración:${RESET}"
+    echo ""
+    echo "    offsec config set EDITOR code"
+    echo "    offsec config set SCAN_PROFILE aggressive"
+    echo "    offsec config list"
     echo ""
     echo -e "${BOLD}  Con VPN:${RESET}"
     echo "    Copiá tu .ovpn a docker/vpn/config.ovpn"
@@ -243,15 +522,22 @@ COMMAND="${1:-help}"
 shift 2>/dev/null || true
 
 case "$COMMAND" in
-    start)          cmd_start "$@" ;;
-    down|stop)      cmd_down ;;
-    restart)        cmd_restart ;;
-    in|connect)     cmd_in ;;
-    status)         cmd_status ;;
-    logs)           cmd_logs "$@" ;;
-    build)          cmd_build "$@" ;;
+    start)               cmd_start "$@" ;;
+    down|stop)           cmd_down ;;
+    restart)             cmd_restart ;;
+    in|connect)          cmd_in ;;
+    status)              cmd_status ;;
+    logs)                cmd_logs "$@" ;;
+    build)               cmd_build "$@" ;;
+    list)                cmd_list ;;
+    new)                 cmd_new "$@" ;;
+    brief)               cmd_brief ;;
+    report)              cmd_report "$@" ;;
+    scope)               cmd_scope "$@" ;;
+    update)              cmd_update "$@" ;;
+    config)              cmd_config "$@" ;;
     version|--version|-v) echo "offsec v${VERSION}" ;;
-    help|--help|-h) _show_help ;;
+    help|--help|-h)      _show_help ;;
     *)
         error "Comando desconocido: '${COMMAND}'"
         _show_help

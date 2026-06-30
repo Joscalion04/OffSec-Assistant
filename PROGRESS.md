@@ -224,7 +224,9 @@ v2.0.0
 
 | Milestone | Version | Focus | Status |
 |------------|----------|--------|---------|
-| M1 | v1.1.0 | Core Stability & Hardening | In Review |
+| M1 | v1.1.0 | Core Stability & Hardening | Done |
+| M1.5 | v1.5.0 | Usability & CLI Tooling | In Review |
+| M1.6 | v1.6.0 | Web UI & Container Dashboard | Planned |
 | M2 | v1.2.0 | DLP v2: Encryption & Vault | Planned |
 | M3 | v1.3.0 | Execution Optimization | Planned |
 | M4 | v1.4.0 | Governance & Forensic Auditing | Planned |
@@ -447,6 +449,219 @@ Added as unplanned work during M1 execution.
 - [x] Docker daemon mode (tail -f /dev/null) — exit no mata el contenedor
 - [x] SIGTERM handler en entrypoint para apagado limpio
 - [x] restart: unless-stopped en docker-compose
+
+---
+
+# M1.5 — v1.5.0 · Usability & CLI Tooling
+
+## Objective
+
+Simplificar la operación diaria del assistant desde el host.
+CLI unificado para gestionar el contenedor, los engagements y la configuración
+sin necesidad de entrar al contenedor para operaciones comunes.
+
+---
+
+## EPIC
+
+```text
+[EPIC] Usability & CLI Tooling
+```
+
+### Child Issues
+
+#### feat(cli): implement `offsec` host entrypoint
+
+**Labels**
+
+```text
+CLI
+Feature
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] Comandos: start, down, restart, in, status, logs, build
+- [x] Modo daemon — exit no mata el contenedor
+
+---
+
+#### feat(cli): fix container session — daemon mode + `offsec in`
+
+**Labels**
+
+```text
+CLI
+Feature
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] docker-compose en modo daemon (tail -f /dev/null)
+- [x] restart: unless-stopped
+- [x] SIGTERM handler en entrypoint
+
+---
+
+#### feat(cli): implement install & bootstrap script
+
+**Labels**
+
+```text
+CLI
+Feature
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] install.sh con detección de deps
+- [x] Symlink en ~/.local/bin
+- [x] Configuración de PATH y .env
+
+---
+
+#### feat(cli): implement engagement shortcuts in offsec CLI
+
+**Labels**
+
+```text
+CLI
+Feature
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] offsec list — engagements con findings y última actividad
+- [x] offsec new <nombre> — inicializa engagement dentro del assistant
+- [x] offsec brief — morning brief desde el host
+- [x] offsec report <engagement> — reporte final desde el host
+- [x] offsec scope <engagement> — abre scope.md en $EDITOR
+
+---
+
+#### feat(cli): implement `offsec update`
+
+**Labels**
+
+```text
+CLI
+Feature
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] git pull desde OFFSEC_HOME
+- [x] Detecta cambios en Dockerfile para rebuild
+- [x] Preserva findings/, logs/, reports/
+- [x] Muestra diff del CHANGELOG
+- [x] offsec update --check sin aplicar cambios
+
+---
+
+#### feat(cli): implement `offsec config`
+
+**Labels**
+
+```text
+CLI
+Feature
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] offsec config set/get/list/reset
+- [x] Persistencia en ~/.config/offsec/config
+- [x] Variables inyectadas en sesión del contenedor (offsec in)
+- [x] Documentación de claves disponibles
+
+---
+
+#### docs(cli): document full CLI reference
+
+**Labels**
+
+```text
+CLI
+Documentation
+P2
+Status: Done
+```
+
+**Acceptance Criteria**
+
+- [x] CLI.md con referencia completa de todos los comandos
+- [x] Flujo típico de engagement de inicio a fin
+- [x] Sección de troubleshooting
+- [x] Guía de instalación
+
+---
+
+#### feat(web): implement container-exposed Web UI
+
+**Labels**
+
+```text
+Dashboard
+Feature
+P3
+Status: Backlog
+```
+
+> Movida a M1.6 — v1.6.0 por scope.
+
+---
+
+# M1.6 — v1.6.0 · Web UI & Container Dashboard
+
+## Objective
+
+Panel web expuesto por el contenedor para visualizar engagements,
+findings y ejecutar comandos desde el browser.
+Graduado desde v1.5.0 por scope.
+
+---
+
+## EPIC
+
+```text
+[EPIC] Web UI & Container Dashboard
+```
+
+### Child Issues
+
+#### feat(web): implement container-exposed Web UI
+
+**Labels**
+
+```text
+Dashboard
+Web UI
+Feature
+P3
+Status: Backlog
+```
+
+**Acceptance Criteria**
+
+- [ ] Dashboard con lista de engagements activos y su estado
+- [ ] Visualización del context.md del engagement seleccionado
+- [ ] Lista de findings con severidad y estado
+- [ ] Terminal web integrada (xterm.js o similar)
+- [ ] Indicador de estado del contenedor
+- [ ] Solo accesible desde localhost
+- [ ] Puerto configurable (default: 8080)
 
 ---
 

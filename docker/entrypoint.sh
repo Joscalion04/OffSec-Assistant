@@ -19,13 +19,24 @@ log_ok()    { echo -e "${GREEN}[offsec]${RESET} $*" >&2; }
 log_warn()  { echo -e "${YELLOW}[offsec][WARN]${RESET} $*" >&2; }
 log_error() { echo -e "${RED}[offsec][ERROR]${RESET} $*" >&2; }
 
-# ── Validar API key ───────────────────────────────────────────────────────────
+# ── Verificar autenticación de Claude Code ────────────────────────────────────
+# Dos modos soportados (excluyentes):
+#   1. Claude Pro/Team — sesión OAuth montada desde ~/.claude del host (recomendado)
+#   2. API Key directa — ANTHROPIC_API_KEY en .env (usuarios con cuenta API)
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    log_error "ANTHROPIC_API_KEY no está definida."
-    log_error "Pasala al ejecutar el contenedor:"
-    log_error "  -e ANTHROPIC_API_KEY=sk-ant-..."
-    log_error "  o vía archivo .env"
-    exit 1
+    # Modo OAuth: verificar que el bind mount de ~/.claude tiene credenciales
+    if [ ! -f "/root/.claude/.credentials.json" ] && \
+       ! find /root/.claude -name "*.json" -newer /proc/1 2>/dev/null | grep -q .; then
+        log_warn "No se detectó sesión Claude activa en /root/.claude"
+        log_warn "En el HOST ejecutá: claude login"
+        log_warn "Luego reiniciá el contenedor: offsec down && offsec start"
+        log_warn "O configurá ANTHROPIC_API_KEY en .env si usás cuenta API."
+        log_warn "Continuando de todas formas — claude login fallará si no hay auth."
+    else
+        log_ok "Sesión Claude Pro detectada en /root/.claude"
+    fi
+else
+    log_ok "Modo API Key — ANTHROPIC_API_KEY configurada"
 fi
 
 # ── Configuración VPN ─────────────────────────────────────────────────────────
