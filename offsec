@@ -105,7 +105,8 @@ cmd_start() {
         warn "Archivo .env no encontrado en ${OFFSEC_HOME}"
         if [[ -f "${OFFSEC_HOME}/.env.example" ]]; then
             info  "Crealo con: cp ${OFFSEC_HOME}/.env.example ${OFFSEC_HOME}/.env"
-            info  "Luego editá ANTHROPIC_API_KEY y volvé a ejecutar offsec start"
+            info  "El contenedor usará tu sesión Claude Pro del host (~/.claude)"
+            info  "Si aún no iniciaste sesión: claude login"
         fi
         exit 1
     fi

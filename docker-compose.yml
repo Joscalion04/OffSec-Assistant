@@ -40,8 +40,10 @@ services:
 
     # ── Variables de entorno ────────────────────────────────────────────────
     environment:
-      # REQUERIDA: pasar desde el host o desde .env
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      # Opcional — solo si usás API Key directa en lugar de Claude Pro.
+      # Con Claude Pro/Team no hace falta: el volumen ~/.claude del host
+      # provee la sesión OAuth autenticada (ver volumen claude-auth abajo).
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       # Opcional: true/false — activa OpenVPN o WireGuard al iniciar
       USE_VPN: "${USE_VPN:-false}"
       REPORT_LANG: "es"
@@ -69,8 +71,12 @@ services:
         source: ./tools
         target: /workspace/tools
         read_only: true
-      # Configuración de Claude Code (persistente entre sesiones)
-      - offsec-claude-config:/root/.claude
+      # Sesión de Claude Code — montada desde el host (Claude Pro/Team).
+      # El contenedor hereda los tokens OAuth del usuario sin API key propia.
+      # Requiere haber ejecutado `claude login` en el host al menos una vez.
+      - type: bind
+        source: "${HOME}/.claude"
+        target: /root/.claude
       # Configs VPN — solo lectura dentro del contenedor
       # El directorio debe existir aunque esté vacío (ver docker/vpn/)
       - type: bind
@@ -123,12 +129,6 @@ services:
       timeout: 5s
       retries: 1
       start_period: 10s
-
-# ── Volúmenes nombrados ───────────────────────────────────────────────────────
-volumes:
-  # Configuración de Claude Code (preferencias, historial de sesión)
-  offsec-claude-config:
-    driver: local
 
 # ── Redes ─────────────────────────────────────────────────────────────────────
 networks:

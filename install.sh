@@ -157,8 +157,9 @@ _setup_env() {
     cp "${SCRIPT_DIR}/.env.example" "$env_file"
 
     echo ""
-    warn "ACCIÓN REQUERIDA: configurá tu API key en ${env_file}"
-    warn "Editá la línea: ANTHROPIC_API_KEY=sk-ant-api03-REEMPLAZAR"
+    ok ".env creado en ${env_file}"
+    info "Autenticación: el contenedor usa tu sesión Claude Pro del host."
+    info "Si aún no iniciaste sesión, ejecutá: claude login"
     echo ""
 }
 
@@ -181,22 +182,29 @@ _print_next_steps() {
     echo -e "${BOLD}  Próximos pasos:${RESET}"
     echo ""
 
+    local step=1
+
     if ! echo "$PATH" | tr ':' '\n' | grep -qx "${INSTALL_DIR}"; then
-        echo "  1. Recargá tu shell:"
+        echo "  ${step}. Recargá tu shell:"
         echo "     source $(_detect_profile)"
         echo ""
-        echo "  2. Configurá tu API key:"
-    else
-        echo "  1. Configurá tu API key:"
+        step=$((step + 1))
     fi
 
-    echo "     vim ${SCRIPT_DIR}/.env"
-    echo "     # ANTHROPIC_API_KEY=sk-ant-..."
-    echo ""
-    echo "  3. Iniciá el assistant:"
+    # Verificar si claude ya está autenticado en el host
+    if [ ! -f "${HOME}/.claude/.credentials.json" ]; then
+        echo "  ${step}. Autenticá Claude Code con tu cuenta Pro/Team:"
+        echo "     claude login"
+        echo "     (solo necesario una vez — el contenedor hereda la sesión)"
+        echo ""
+        step=$((step + 1))
+    fi
+
+    echo "  ${step}. Iniciá el assistant:"
     echo "     offsec start"
     echo ""
-    echo "  4. Conectate:"
+    step=$((step + 1))
+    echo "  ${step}. Conectate:"
     echo "     offsec in"
     echo ""
     echo -e "  ${CYAN}Ayuda:${RESET} offsec help"
